@@ -22,4 +22,4 @@
 ## FASE 4
 - [x] Crear apps/web Next.js
 - [x] Implementar dashboard page.tsx
-- [ ] Crear turbo.json y README.md
+- [x] Crear turbo.json y README.md
