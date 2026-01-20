@@ -4,14 +4,14 @@
 - [x] Inicializar monorepo Turborepo
 - [x] Crear packages/types con tipos TypeScript
 - [x] Crear packages/db con Supabase client
-- [ ] Crear packages/ai con OpenAI client
+- [x] Crear packages/ai con OpenAI client
 
 ## FASE 2
-- [ ] Crear apps/core Next.js
-- [ ] Implementar lib/telegram.ts
-- [ ] Implementar lib/brain.ts
-- [ ] Implementar api/telegram/webhook/route.ts
-- [ ] Implementar api/agent/cron/route.ts
+- [x] Crear apps/core Next.js
+- [x] Implementar lib/telegram.ts
+- [x] Implementar lib/brain.ts
+- [x] Implementar api/telegram/webhook/route.ts
+- [x] Implementar api/agent/cron/route.ts
 
 ## FASE 3
 - [ ] Crear apps/finance Next.js
