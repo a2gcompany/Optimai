@@ -68,3 +68,49 @@ Iniciado: Wed Jan 21 02:35:15 CST 2026
 - FASE 3: Crear apps/finance con parser de CSV y categorizador
 
 ---
+
+## Iteración 6 - 2026-01-21
+
+### Completado:
+- [x] Crear apps/finance Next.js con estructura completa
+- [x] Implementar lib/parser.ts (CSV parser con auto-detección)
+- [x] Implementar lib/categorizer.ts (categorizador AI)
+- [x] Implementar api/upload/route.ts (endpoint de upload)
+- [x] Implementar api/transactions/route.ts (CRUD transacciones)
+- [x] Implementar api/transactions/categorize/route.ts (categorización)
+
+### Detalles:
+- **apps/finance/**: Nueva app Next.js para gestión financiera (puerto 3002)
+- **lib/parser.ts**:
+  - Parser de CSV usando PapaParse
+  - Auto-detección de delimitadores y formato de fechas
+  - Presets para bancos: BBVA, Santander, Revolut, Wise
+  - Parsing de montos en formato EU y US
+  - Manejo de errores por fila
+- **lib/categorizer.ts**:
+  - Categorización por keywords (11 categorías predefinidas)
+  - Categorización AI con GPT-4o-mini
+  - Sistema de patrones de usuario para aprendizaje
+  - Función smartCategorize: patterns → keywords → AI
+  - Batch processing con rate limiting
+- **api/upload/route.ts**:
+  - Acepta multipart/form-data y JSON
+  - Validación de tamaño (max 5MB) y tipo de archivo
+  - Integración con parser y categorizador
+  - Soporte para presets de banco
+- **api/transactions/route.ts**:
+  - GET: Listar con filtros (categoría, tipo, fechas)
+  - POST: Crear transacciones (batch)
+  - Paginación completa
+- **api/transactions/categorize/route.ts**:
+  - POST: Categorizar transacciones
+  - PUT: Añadir patrones de usuario
+  - GET: Listar categorías disponibles
+
+### Commit:
+- `1452de0` - feat: crear apps/finance con CSV parser y categorizador AI
+
+### Pendiente próxima iteración:
+- FASE 4: Crear apps/web con dashboard
+
+---

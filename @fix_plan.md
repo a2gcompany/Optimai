@@ -14,10 +14,10 @@
 - [x] Implementar api/agent/cron/route.ts
 
 ## FASE 3
-- [ ] Crear apps/finance Next.js
-- [ ] Implementar lib/parser.ts
-- [ ] Implementar lib/categorizer.ts
-- [ ] Implementar api/upload/route.ts
+- [x] Crear apps/finance Next.js
+- [x] Implementar lib/parser.ts
+- [x] Implementar lib/categorizer.ts
+- [x] Implementar api/upload/route.ts
 
 ## FASE 4
 - [ ] Crear apps/web Next.js
