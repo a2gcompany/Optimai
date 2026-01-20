@@ -3,7 +3,7 @@
 ## FASE 1
 - [x] Inicializar monorepo Turborepo
 - [x] Crear packages/types con tipos TypeScript
-- [ ] Crear packages/db con Supabase client
+- [x] Crear packages/db con Supabase client
 - [ ] Crear packages/ai con OpenAI client
 
 ## FASE 2
