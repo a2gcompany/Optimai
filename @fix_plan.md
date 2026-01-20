@@ -1,7 +1,7 @@
 # Optimai Tareas
 
 ## FASE 1
-- [ ] Inicializar monorepo Turborepo
+- [x] Inicializar monorepo Turborepo
 - [ ] Crear packages/types con tipos TypeScript
 - [ ] Crear packages/db con Supabase client
 - [ ] Crear packages/ai con OpenAI client
