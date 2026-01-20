@@ -1,27 +1,39 @@
-# Ralph Fix Plan
+# Optimai - Tareas
 
-## High Priority
-- [ ] Set up basic project structure and build system
-- [ ] Define core data structures and types
-- [ ] Implement basic input/output handling
-- [ ] Create test framework and initial tests
+## FASE 1: ESTRUCTURA
+- [ ] Inicializar monorepo con Turborepo
+- [ ] Crear package.json raíz con workspaces
+- [ ] Crear packages/types con todos los tipos TypeScript
+- [ ] Crear packages/db con cliente Supabase y queries
+- [ ] Crear packages/db/src/schema.sql con todas las tablas
+- [ ] Crear packages/ai con cliente OpenAI y prompts
 
-## Medium Priority
-- [ ] Add error handling and validation
-- [ ] Implement core business logic
-- [ ] Add configuration management
-- [ ] Create user documentation
+## FASE 2: CORE
+- [ ] Crear apps/core con Next.js 14
+- [ ] Implementar apps/core/src/lib/telegram.ts
+- [ ] Implementar apps/core/src/lib/brain.ts
+- [ ] Implementar apps/core/src/lib/agent.ts
+- [ ] Implementar apps/core/src/app/api/telegram/webhook/route.ts
+- [ ] Implementar apps/core/src/app/api/agent/cron/route.ts
+- [ ] Implementar apps/core/src/app/api/inbound/route.ts
+- [ ] Crear apps/core/vercel.json con cron config
+- [ ] Crear apps/core/src/app/page.tsx
 
-## Low Priority
-- [ ] Performance optimization
-- [ ] Extended feature set
-- [ ] Integration with external services
-- [ ] Advanced error recovery
+## FASE 3: FINANCE
+- [ ] Crear apps/finance con Next.js 14
+- [ ] Implementar apps/finance/src/lib/parser.ts para CSV
+- [ ] Implementar apps/finance/src/lib/categorizer.ts con AI
+- [ ] Implementar apps/finance/src/lib/analytics.ts
+- [ ] Implementar apps/finance/src/app/api/upload/route.ts
+- [ ] Implementar apps/finance/src/app/api/report/route.ts
 
-## Completed
-- [x] Project initialization
+## FASE 4: WEB
+- [ ] Crear apps/web con Next.js 14
+- [ ] Implementar dashboard en apps/web/src/app/page.tsx con stats cards
 
-## Notes
-- Focus on MVP functionality first
-- Ensure each feature is properly tested
-- Update this file after each major milestone
+## FASE 5: CONFIG FINAL
+- [ ] Crear turbo.json en raíz
+- [ ] Crear .env.example con todas las variables
+- [ ] Crear README.md con instrucciones
+- [ ] Ejecutar npm install
+- [ ] Verificar que npm run build funciona
