@@ -20,6 +20,6 @@
 - [x] Implementar api/upload/route.ts
 
 ## FASE 4
-- [ ] Crear apps/web Next.js
-- [ ] Implementar dashboard page.tsx
+- [x] Crear apps/web Next.js
+- [x] Implementar dashboard page.tsx
 - [ ] Crear turbo.json y README.md

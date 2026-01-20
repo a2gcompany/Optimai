@@ -114,3 +114,43 @@ Iniciado: Wed Jan 21 02:35:15 CST 2026
 - FASE 4: Crear apps/web con dashboard
 
 ---
+
+## Iteración 7 - 2026-01-21
+
+### Completado:
+- [x] Crear apps/web Next.js con estructura completa
+- [x] Implementar dashboard page.tsx con métricas y visualización
+- [x] Crear componentes reutilizables (StatCard, TaskList, TransactionList, ReminderList, Sidebar)
+- [x] Configurar Tailwind CSS con tema personalizado
+- [x] Crear cliente API para comunicación con microservicios
+
+### Detalles:
+- **apps/web/**: Nueva app Next.js para dashboard web (puerto 3000)
+- **Configuración**:
+  - Next.js 14 con App Router
+  - Tailwind CSS con tema personalizado (colores primary)
+  - Dependencias: recharts, lucide-react, date-fns
+- **Componentes creados**:
+  - `StatCard`: Tarjeta de métricas con icono, valor, tendencia
+  - `TaskList`: Lista de tareas con estados y prioridades
+  - `TransactionList`: Lista de transacciones con formato de moneda
+  - `ReminderList`: Lista de recordatorios con countdown
+  - `Sidebar`: Navegación lateral con rutas principales
+- **lib/api.ts**:
+  - Cliente API para comunicarse con apps/core y apps/finance
+  - Métodos para obtener tareas, transacciones, recordatorios
+  - Función getDashboardData() que carga todo en paralelo
+  - Fallback a datos mock si los servicios no responden
+- **Dashboard (page.tsx)**:
+  - Grid de 4 estadísticas principales
+  - Secciones: Tareas recientes, Recordatorios próximos, Últimas transacciones
+  - Datos de demostración con contexto de A2G (artistas, empresas)
+  - Soporte dark mode
+
+### Commit:
+- `feat: crear apps/web con dashboard y componentes UI`
+
+### Pendiente próxima iteración:
+- Crear turbo.json actualizado y README.md mejorado
+
+---
