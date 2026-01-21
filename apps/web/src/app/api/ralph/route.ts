@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+// API Version: 1.0.0 - Real-time Ralph status
+
 // Supabase client
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
