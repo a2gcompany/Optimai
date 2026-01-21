@@ -27,10 +27,10 @@
 - [x] Todo local, nada sube a la nube
 
 ## WORLD MULTI-PUEBLO
-- [ ] Mostrar 3 pueblos en mapa
-- [ ] Cada pueblo tiene su Ralph
-- [ ] Stats de cada pueblo visibles
-- [ ] Caravanas para tareas compartidas
+- [x] Mostrar 3 pueblos en mapa
+- [x] Cada pueblo tiene su Ralph
+- [x] Stats de cada pueblo visibles
+- [x] Caravanas para tareas compartidas
 - [ ] País crece con actividad total
 
 ## ARQUITECTURA LOCAL
