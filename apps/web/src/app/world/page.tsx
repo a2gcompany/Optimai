@@ -3,17 +3,24 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, Task } from '@/lib/api';
+import { Zap, Coins, Activity, Maximize2, X } from 'lucide-react';
 
-// Types
+// ============================================================================
+// TYPES
+// ============================================================================
+
 interface Building {
   id: string;
   name: string;
+  type: 'hq' | 'bank' | 'workshop' | 'library' | 'tower' | 'config';
   route: string;
   x: number;
   y: number;
   width: number;
   height: number;
+  roofHeight: number;
   color: string;
+  accentColor: string;
   icon: string;
   stats?: { count: number; label: string };
 }
@@ -28,6 +35,19 @@ interface TaskAgent {
   speed: number;
   color: string;
   building: string;
+  state: 'walking' | 'working' | 'celebrating';
+  celebrateTimer: number;
+}
+
+interface RalphState {
+  x: number;
+  y: number;
+  targetX: number;
+  targetY: number;
+  state: 'idle' | 'walking' | 'building' | 'thinking';
+  currentTask: string;
+  speechBubble: string;
+  speechTimer: number;
 }
 
 interface Particle {
@@ -37,9 +57,25 @@ interface Particle {
   vy: number;
   life: number;
   color: string;
+  type: 'spark' | 'coin' | 'star';
 }
 
-// Isometric helpers
+interface EnergySystem {
+  current: number;
+  max: number;
+  rechargeTime: number; // seconds until next recharge
+}
+
+interface LogEntry {
+  time: string;
+  action: string;
+  type: 'task' | 'energy' | 'coin' | 'system';
+}
+
+// ============================================================================
+// ISOMETRIC HELPERS
+// ============================================================================
+
 function toIso(x: number, y: number): { x: number; y: number } {
   return {
     x: (x - y) * 0.866,
@@ -47,138 +83,340 @@ function toIso(x: number, y: number): { x: number; y: number } {
   };
 }
 
-function fromIso(isoX: number, isoY: number): { x: number; y: number } {
-  return {
-    x: isoX / 0.866 / 2 + isoY,
-    y: isoY - isoX / 0.866 / 2,
-  };
+function adjustBrightness(hex: string, percent: number): string {
+  const num = parseInt(hex.replace('#', ''), 16);
+  const r = Math.min(255, Math.max(0, (num >> 16) + percent));
+  const g = Math.min(255, Math.max(0, ((num >> 8) & 0x00ff) + percent));
+  const b = Math.min(255, Math.max(0, (num & 0x0000ff) + percent));
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
 }
 
-// Pixel art building drawing
+// ============================================================================
+// DRAWING FUNCTIONS
+// ============================================================================
+
+function drawGround(
+  ctx: CanvasRenderingContext2D,
+  offsetX: number,
+  offsetY: number,
+  scale: number
+) {
+  const gridSize = 40;
+  const gridCount = 15;
+
+  // Draw grass tiles
+  for (let i = -gridCount; i <= gridCount; i++) {
+    for (let j = -gridCount; j <= gridCount; j++) {
+      const iso = toIso(i * gridSize, j * gridSize);
+      const x = iso.x * scale + offsetX;
+      const y = iso.y * scale + offsetY;
+
+      // Checkerboard grass pattern
+      const isLight = (i + j) % 2 === 0;
+      ctx.fillStyle = isLight ? '#1a2e1a' : '#162816';
+
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + gridSize * 0.866 * scale, y + gridSize * 0.5 * scale);
+      ctx.lineTo(x, y + gridSize * scale);
+      ctx.lineTo(x - gridSize * 0.866 * scale, y + gridSize * 0.5 * scale);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  // Draw path
+  ctx.strokeStyle = 'rgba(100, 116, 139, 0.3)';
+  ctx.lineWidth = 8 * scale;
+  ctx.setLineDash([10, 5]);
+
+  // Path connecting buildings
+  const pathPoints = [
+    toIso(-100, 75),
+    toIso(0, 0),
+    toIso(150, 0),
+    toIso(150, 150),
+    toIso(0, 150),
+    toIso(0, 0),
+    toIso(75, 75),
+    toIso(300, 75),
+  ];
+
+  ctx.beginPath();
+  pathPoints.forEach((p, i) => {
+    const x = p.x * scale + offsetX;
+    const y = p.y * scale + offsetY;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
 function drawBuilding(
   ctx: CanvasRenderingContext2D,
   building: Building,
   offsetX: number,
   offsetY: number,
   scale: number,
-  isHovered: boolean
+  isHovered: boolean,
+  frame: number
 ) {
-  const { x, y, width, height, color, icon, name, stats } = building;
+  const { x, y, width, height, roofHeight, color, accentColor, icon, name, type, stats } = building;
 
-  // Convert to isometric
   const iso = toIso(x, y);
   const screenX = iso.x * scale + offsetX;
   const screenY = iso.y * scale + offsetY;
 
   const w = width * scale * 0.866;
   const h = height * scale * 0.5;
-  const buildingHeight = 60 * scale;
+  const bh = roofHeight * scale;
+
+  // Hover animation
+  const hoverOffset = isHovered ? Math.sin(frame * 0.1) * 2 : 0;
 
   // Shadow
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
   ctx.beginPath();
-  ctx.moveTo(screenX, screenY + buildingHeight + 10);
-  ctx.lineTo(screenX + w, screenY + h + buildingHeight + 10);
-  ctx.lineTo(screenX, screenY + h * 2 + buildingHeight + 10);
-  ctx.lineTo(screenX - w, screenY + h + buildingHeight + 10);
-  ctx.closePath();
+  ctx.ellipse(screenX, screenY + bh + h + 15, w * 0.8, h * 0.4, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Parse color
-  const baseColor = color;
-  const darkColor = adjustBrightness(color, -30);
-  const lightColor = adjustBrightness(color, 20);
+  const darkColor = adjustBrightness(color, -40);
+  const lightColor = adjustBrightness(color, 30);
 
-  // Left face (darker)
+  // Left wall
   ctx.fillStyle = darkColor;
   ctx.beginPath();
-  ctx.moveTo(screenX - w, screenY + h);
-  ctx.lineTo(screenX, screenY + h * 2);
-  ctx.lineTo(screenX, screenY + h * 2 + buildingHeight);
-  ctx.lineTo(screenX - w, screenY + h + buildingHeight);
+  ctx.moveTo(screenX - w, screenY + h - hoverOffset);
+  ctx.lineTo(screenX, screenY + h * 2 - hoverOffset);
+  ctx.lineTo(screenX, screenY + h * 2 + bh - hoverOffset);
+  ctx.lineTo(screenX - w, screenY + h + bh - hoverOffset);
   ctx.closePath();
   ctx.fill();
 
-  // Right face (medium)
-  ctx.fillStyle = baseColor;
+  // Right wall
+  ctx.fillStyle = color;
   ctx.beginPath();
-  ctx.moveTo(screenX + w, screenY + h);
-  ctx.lineTo(screenX, screenY + h * 2);
-  ctx.lineTo(screenX, screenY + h * 2 + buildingHeight);
-  ctx.lineTo(screenX + w, screenY + h + buildingHeight);
+  ctx.moveTo(screenX + w, screenY + h - hoverOffset);
+  ctx.lineTo(screenX, screenY + h * 2 - hoverOffset);
+  ctx.lineTo(screenX, screenY + h * 2 + bh - hoverOffset);
+  ctx.lineTo(screenX + w, screenY + h + bh - hoverOffset);
   ctx.closePath();
   ctx.fill();
 
-  // Top face (lightest)
-  ctx.fillStyle = isHovered ? adjustBrightness(lightColor, 20) : lightColor;
-  ctx.beginPath();
-  ctx.moveTo(screenX, screenY);
-  ctx.lineTo(screenX + w, screenY + h);
-  ctx.lineTo(screenX, screenY + h * 2);
-  ctx.lineTo(screenX - w, screenY + h);
-  ctx.closePath();
-  ctx.fill();
+  // Roof based on building type
+  if (type === 'tower') {
+    // Pointed roof for tower
+    ctx.fillStyle = accentColor;
+    ctx.beginPath();
+    ctx.moveTo(screenX, screenY - 30 * scale - hoverOffset);
+    ctx.lineTo(screenX + w, screenY + h - hoverOffset);
+    ctx.lineTo(screenX, screenY + h * 2 - hoverOffset);
+    ctx.lineTo(screenX - w, screenY + h - hoverOffset);
+    ctx.closePath();
+    ctx.fill();
+  } else if (type === 'hq') {
+    // Flat roof with antenna
+    ctx.fillStyle = lightColor;
+    ctx.beginPath();
+    ctx.moveTo(screenX, screenY - hoverOffset);
+    ctx.lineTo(screenX + w, screenY + h - hoverOffset);
+    ctx.lineTo(screenX, screenY + h * 2 - hoverOffset);
+    ctx.lineTo(screenX - w, screenY + h - hoverOffset);
+    ctx.closePath();
+    ctx.fill();
 
-  // Outline
-  ctx.strokeStyle = isHovered ? '#fff' : 'rgba(255,255,255,0.3)';
-  ctx.lineWidth = isHovered ? 2 : 1;
-  ctx.stroke();
+    // Antenna
+    ctx.strokeStyle = '#64748b';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(screenX, screenY - hoverOffset);
+    ctx.lineTo(screenX, screenY - 25 * scale - hoverOffset);
+    ctx.stroke();
 
-  // Windows (pixel art style)
-  const windowSize = 8 * scale;
-  const windowGap = 12 * scale;
-  ctx.fillStyle = 'rgba(255, 255, 200, 0.6)';
+    // Blinking light
+    if (Math.floor(frame / 30) % 2 === 0) {
+      ctx.fillStyle = '#ef4444';
+      ctx.beginPath();
+      ctx.arc(screenX, screenY - 25 * scale - hoverOffset, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else {
+    // Standard roof
+    ctx.fillStyle = lightColor;
+    ctx.beginPath();
+    ctx.moveTo(screenX, screenY - hoverOffset);
+    ctx.lineTo(screenX + w, screenY + h - hoverOffset);
+    ctx.lineTo(screenX, screenY + h * 2 - hoverOffset);
+    ctx.lineTo(screenX - w, screenY + h - hoverOffset);
+    ctx.closePath();
+    ctx.fill();
+  }
 
-  for (let row = 0; row < 3; row++) {
+  // Windows
+  const windowColor = 'rgba(255, 255, 200, 0.7)';
+  const windowSize = 10 * scale;
+
+  for (let row = 0; row < 2; row++) {
     for (let col = 0; col < 2; col++) {
-      // Right face windows
-      const wx = screenX + w * 0.3 + col * windowGap;
-      const wy = screenY + h + 15 * scale + row * (windowSize + 5 * scale);
-      ctx.fillRect(wx, wy, windowSize * 0.7, windowSize);
+      // Right side windows
+      const rwx = screenX + w * 0.25 + col * 15 * scale;
+      const rwy = screenY + h + 12 * scale + row * 18 * scale - hoverOffset;
+      ctx.fillStyle = windowColor;
+      ctx.fillRect(rwx, rwy, windowSize * 0.8, windowSize);
 
-      // Left face windows
-      const lwx = screenX - w * 0.7 + col * windowGap;
-      ctx.fillRect(lwx, wy, windowSize * 0.7, windowSize);
+      // Left side windows
+      const lwx = screenX - w * 0.75 + col * 15 * scale;
+      ctx.fillRect(lwx, rwy, windowSize * 0.8, windowSize);
     }
   }
 
-  // Icon on top
-  ctx.font = `${24 * scale}px Arial`;
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#fff';
-  ctx.fillText(icon, screenX, screenY + h - 5 * scale);
+  // Door
+  ctx.fillStyle = adjustBrightness(accentColor, -20);
+  ctx.fillRect(screenX - 6 * scale, screenY + h * 2 + bh - 18 * scale - hoverOffset, 12 * scale, 18 * scale);
 
-  // Name label
-  ctx.font = `bold ${11 * scale}px "SF Mono", monospace`;
-  ctx.fillStyle = isHovered ? '#fff' : 'rgba(255,255,255,0.8)';
-  ctx.fillText(name, screenX, screenY + h * 2 + buildingHeight + 20 * scale);
+  // Icon on roof
+  ctx.font = `${28 * scale}px Arial`;
+  ctx.textAlign = 'center';
+  ctx.fillText(icon, screenX, screenY + h - 10 * scale - hoverOffset);
+
+  // Building name
+  ctx.font = `bold ${10 * scale}px "SF Mono", monospace`;
+  ctx.fillStyle = isHovered ? '#fff' : 'rgba(255,255,255,0.7)';
+  ctx.fillText(name, screenX, screenY + h * 2 + bh + 25 * scale);
 
   // Stats badge
   if (stats && stats.count > 0) {
-    const badgeX = screenX + w * 0.5;
-    const badgeY = screenY - 5 * scale;
+    const badgeX = screenX + w * 0.6;
+    const badgeY = screenY - 10 * scale - hoverOffset;
+
+    // Badge background
     ctx.fillStyle = '#ef4444';
     ctx.beginPath();
-    ctx.arc(badgeX, badgeY, 12 * scale, 0, Math.PI * 2);
+    ctx.arc(badgeX, badgeY, 14 * scale, 0, Math.PI * 2);
     ctx.fill();
+
+    // Badge text
     ctx.fillStyle = '#fff';
-    ctx.font = `bold ${10 * scale}px Arial`;
+    ctx.font = `bold ${11 * scale}px Arial`;
     ctx.fillText(String(stats.count), badgeX, badgeY + 4 * scale);
   }
 
   // Hover glow
   if (isHovered) {
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 20;
-    ctx.strokeStyle = color;
+    ctx.shadowColor = accentColor;
+    ctx.shadowBlur = 25;
+    ctx.strokeStyle = accentColor;
     ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(screenX, screenY - hoverOffset);
+    ctx.lineTo(screenX + w, screenY + h - hoverOffset);
+    ctx.lineTo(screenX + w, screenY + h + bh - hoverOffset);
+    ctx.lineTo(screenX, screenY + h * 2 + bh - hoverOffset);
+    ctx.lineTo(screenX - w, screenY + h + bh - hoverOffset);
+    ctx.lineTo(screenX - w, screenY + h - hoverOffset);
+    ctx.closePath();
     ctx.stroke();
     ctx.shadowBlur = 0;
   }
 }
 
-// Draw task agent (small character)
-function drawAgent(
+function drawRalph(
+  ctx: CanvasRenderingContext2D,
+  ralph: RalphState,
+  offsetX: number,
+  offsetY: number,
+  scale: number,
+  frame: number
+) {
+  const iso = toIso(ralph.x, ralph.y);
+  const screenX = iso.x * scale + offsetX;
+  const screenY = iso.y * scale + offsetY;
+
+  const bob = ralph.state === 'walking' ? Math.sin(frame * 0.2) * 3 : 0;
+  const size = 12 * scale;
+
+  // Shadow
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+  ctx.beginPath();
+  ctx.ellipse(screenX, screenY + 15 * scale, 10 * scale, 5 * scale, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Body
+  ctx.fillStyle = '#06b6d4'; // Cyan for Ralph
+  ctx.fillRect(screenX - size / 2, screenY - size + bob, size, size * 1.4);
+
+  // Head
+  ctx.fillStyle = '#fcd5ce';
+  ctx.beginPath();
+  ctx.arc(screenX, screenY - size * 1.4 + bob, size * 0.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Hat (robot/AI style)
+  ctx.fillStyle = '#06b6d4';
+  ctx.fillRect(screenX - size * 0.4, screenY - size * 1.9 + bob, size * 0.8, size * 0.3);
+
+  // Antenna
+  ctx.strokeStyle = '#64748b';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(screenX, screenY - size * 1.9 + bob);
+  ctx.lineTo(screenX, screenY - size * 2.3 + bob);
+  ctx.stroke();
+
+  // Antenna light
+  ctx.fillStyle = ralph.state === 'building' ? '#22c55e' : (ralph.state === 'thinking' ? '#f59e0b' : '#3b82f6');
+  ctx.beginPath();
+  ctx.arc(screenX, screenY - size * 2.3 + bob, 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Eyes
+  ctx.fillStyle = '#1e293b';
+  const eyeOffset = ralph.state === 'building' ? Math.sin(frame * 0.3) * 2 : 0;
+  ctx.fillRect(screenX - 4 * scale + eyeOffset, screenY - size * 1.5 + bob, 3 * scale, 3 * scale);
+  ctx.fillRect(screenX + 2 * scale + eyeOffset, screenY - size * 1.5 + bob, 3 * scale, 3 * scale);
+
+  // Tool when building
+  if (ralph.state === 'building') {
+    const hammerAngle = Math.sin(frame * 0.3) * 0.5;
+    ctx.save();
+    ctx.translate(screenX + size, screenY - size * 0.5 + bob);
+    ctx.rotate(hammerAngle);
+    ctx.fillStyle = '#854d0e';
+    ctx.fillRect(0, 0, 4 * scale, 15 * scale);
+    ctx.fillStyle = '#64748b';
+    ctx.fillRect(-3 * scale, -5 * scale, 10 * scale, 8 * scale);
+    ctx.restore();
+  }
+
+  // Speech bubble
+  if (ralph.speechTimer > 0 && ralph.speechBubble) {
+    const bubbleWidth = Math.min(ralph.speechBubble.length * 7 + 20, 200);
+    const bubbleX = screenX - bubbleWidth / 2;
+    const bubbleY = screenY - size * 3.5 + bob;
+
+    // Bubble background
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    ctx.beginPath();
+    ctx.roundRect(bubbleX, bubbleY, bubbleWidth, 24, 8);
+    ctx.fill();
+
+    // Bubble pointer
+    ctx.beginPath();
+    ctx.moveTo(screenX - 5, bubbleY + 24);
+    ctx.lineTo(screenX, bubbleY + 32);
+    ctx.lineTo(screenX + 5, bubbleY + 24);
+    ctx.fill();
+
+    // Bubble text
+    ctx.fillStyle = '#1e293b';
+    ctx.font = '11px "SF Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(ralph.speechBubble.substring(0, 25), screenX, bubbleY + 16);
+  }
+}
+
+function drawTaskAgent(
   ctx: CanvasRenderingContext2D,
   agent: TaskAgent,
   offsetX: number,
@@ -190,33 +428,56 @@ function drawAgent(
   const screenX = iso.x * scale + offsetX;
   const screenY = iso.y * scale + offsetY;
 
-  // Bobbing animation
-  const bob = Math.sin(frame * 0.1 + agent.x) * 2;
+  const bob = agent.state === 'walking' ? Math.sin(frame * 0.15 + agent.x) * 2 : 0;
+  const size = 8 * scale;
 
   // Shadow
   ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
   ctx.beginPath();
-  ctx.ellipse(screenX, screenY + 12 * scale, 6 * scale, 3 * scale, 0, 0, Math.PI * 2);
+  ctx.ellipse(screenX, screenY + 10 * scale, 6 * scale, 3 * scale, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Body (pixel art style)
-  const size = 8 * scale;
+  if (agent.state === 'celebrating') {
+    // Celebration animation - jumping
+    const jumpHeight = Math.abs(Math.sin(frame * 0.2)) * 15;
 
-  // Body
-  ctx.fillStyle = agent.color;
-  ctx.fillRect(screenX - size / 2, screenY - size + bob, size, size * 1.2);
+    ctx.fillStyle = agent.color;
+    ctx.fillRect(screenX - size / 2, screenY - size - jumpHeight, size, size * 1.2);
 
-  // Head
-  ctx.fillStyle = '#fcd5ce';
-  ctx.fillRect(screenX - size / 3, screenY - size * 1.5 + bob, size * 0.66, size * 0.6);
+    ctx.fillStyle = '#fcd5ce';
+    ctx.fillRect(screenX - size / 3, screenY - size * 1.4 - jumpHeight, size * 0.66, size * 0.5);
 
-  // Eyes
-  ctx.fillStyle = '#1e293b';
-  ctx.fillRect(screenX - 2 * scale, screenY - size * 1.3 + bob, 2 * scale, 2 * scale);
-  ctx.fillRect(screenX + 1 * scale, screenY - size * 1.3 + bob, 2 * scale, 2 * scale);
+    // Happy eyes (^_^)
+    ctx.fillStyle = '#1e293b';
+    ctx.beginPath();
+    ctx.arc(screenX - 2 * scale, screenY - size * 1.2 - jumpHeight, 2 * scale, 0, Math.PI, true);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(screenX + 2 * scale, screenY - size * 1.2 - jumpHeight, 2 * scale, 0, Math.PI, true);
+    ctx.stroke();
+
+    // Stars around
+    ctx.fillStyle = '#fbbf24';
+    for (let i = 0; i < 3; i++) {
+      const starX = screenX + Math.cos(frame * 0.1 + i * 2) * 20;
+      const starY = screenY - size - jumpHeight + Math.sin(frame * 0.1 + i * 2) * 10;
+      ctx.font = '12px Arial';
+      ctx.fillText('★', starX, starY);
+    }
+  } else {
+    // Normal state
+    ctx.fillStyle = agent.color;
+    ctx.fillRect(screenX - size / 2, screenY - size + bob, size, size * 1.2);
+
+    ctx.fillStyle = '#fcd5ce';
+    ctx.fillRect(screenX - size / 3, screenY - size * 1.4 + bob, size * 0.66, size * 0.5);
+
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(screenX - 2 * scale, screenY - size * 1.2 + bob, 2 * scale, 2 * scale);
+    ctx.fillRect(screenX + 1 * scale, screenY - size * 1.2 + bob, 2 * scale, 2 * scale);
+  }
 }
 
-// Draw completion particle effect
 function drawParticles(
   ctx: CanvasRenderingContext2D,
   particles: Particle[],
@@ -230,76 +491,109 @@ function drawParticles(
     const screenY = iso.y * scale + offsetY;
 
     ctx.globalAlpha = p.life;
-    ctx.fillStyle = p.color;
-    ctx.beginPath();
-    ctx.arc(screenX, screenY, 3 * scale * p.life, 0, Math.PI * 2);
-    ctx.fill();
+
+    if (p.type === 'coin') {
+      ctx.fillStyle = '#fbbf24';
+      ctx.font = `${16 * p.life}px Arial`;
+      ctx.fillText('🪙', screenX - 8, screenY);
+    } else if (p.type === 'star') {
+      ctx.fillStyle = p.color;
+      ctx.font = `${14 * p.life}px Arial`;
+      ctx.fillText('✨', screenX - 7, screenY);
+    } else {
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(screenX, screenY, 4 * scale * p.life, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
   ctx.globalAlpha = 1;
 }
 
-// Color helpers
-function adjustBrightness(hex: string, percent: number): string {
-  const num = parseInt(hex.replace('#', ''), 16);
-  const r = Math.min(255, Math.max(0, (num >> 16) + percent));
-  const g = Math.min(255, Math.max(0, ((num >> 8) & 0x00ff) + percent));
-  const b = Math.min(255, Math.max(0, (num & 0x0000ff) + percent));
-  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
-}
-
-// Draw ground grid
-function drawGround(
-  ctx: CanvasRenderingContext2D,
-  offsetX: number,
-  offsetY: number,
-  scale: number,
-  width: number,
-  height: number
-) {
-  const gridSize = 50;
-  const gridCount = 20;
-
-  ctx.strokeStyle = 'rgba(99, 102, 241, 0.1)';
-  ctx.lineWidth = 1;
-
-  for (let i = -gridCount; i <= gridCount; i++) {
-    // Horizontal lines
-    const start1 = toIso(-gridCount * gridSize, i * gridSize);
-    const end1 = toIso(gridCount * gridSize, i * gridSize);
-    ctx.beginPath();
-    ctx.moveTo(start1.x * scale + offsetX, start1.y * scale + offsetY);
-    ctx.lineTo(end1.x * scale + offsetX, end1.y * scale + offsetY);
-    ctx.stroke();
-
-    // Vertical lines
-    const start2 = toIso(i * gridSize, -gridCount * gridSize);
-    const end2 = toIso(i * gridSize, gridCount * gridSize);
-    ctx.beginPath();
-    ctx.moveTo(start2.x * scale + offsetX, start2.y * scale + offsetY);
-    ctx.lineTo(end2.x * scale + offsetX, end2.y * scale + offsetY);
-    ctx.stroke();
-  }
-}
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
 
 export default function WorldPage() {
   const router = useRouter();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hoveredBuilding, setHoveredBuilding] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [stats, setStats] = useState({ tasks: 0, ideas: 0, reminders: 0, transactions: 0 });
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [energy, setEnergy] = useState<EnergySystem>({ current: 45, max: 50, rechargeTime: 3600 });
+  const [coins, setCoins] = useState(0);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+
   const frameRef = useRef(0);
   const agentsRef = useRef<TaskAgent[]>([]);
   const particlesRef = useRef<Particle[]>([]);
+  const ralphRef = useRef<RalphState>({
+    x: 75,
+    y: 75,
+    targetX: 75,
+    targetY: 75,
+    state: 'idle',
+    currentTask: '',
+    speechBubble: '',
+    speechTimer: 0,
+  });
 
   // Buildings configuration
   const buildings: Building[] = [
-    { id: 'core', name: 'CORE', route: '/', x: 0, y: 0, width: 80, height: 80, color: '#6366f1', icon: '🏠' },
-    { id: 'tasks', name: 'TAREAS', route: '/tasks', x: 150, y: 0, width: 70, height: 70, color: '#22c55e', icon: '✓', stats: { count: stats.tasks, label: 'pending' } },
-    { id: 'finance', name: 'FINANZAS', route: '/finance', x: 0, y: 150, width: 70, height: 70, color: '#f59e0b', icon: '💰', stats: { count: stats.transactions, label: 'this month' } },
-    { id: 'ideas', name: 'IDEAS', route: '/ideas', x: 150, y: 150, width: 70, height: 70, color: '#ec4899', icon: '💡', stats: { count: stats.ideas, label: 'total' } },
-    { id: 'reminders', name: 'RECORDATORIOS', route: '/reminders', x: 300, y: 75, width: 60, height: 60, color: '#8b5cf6', icon: '🔔', stats: { count: stats.reminders, label: 'pending' } },
-    { id: 'settings', name: 'CONFIG', route: '/settings', x: -100, y: 75, width: 50, height: 50, color: '#64748b', icon: '⚙️' },
+    {
+      id: 'hq', name: 'HQ', type: 'hq', route: '/',
+      x: 0, y: 0, width: 90, height: 90, roofHeight: 70,
+      color: '#4f46e5', accentColor: '#818cf8', icon: '🏛️',
+    },
+    {
+      id: 'workshop', name: 'TALLER', type: 'workshop', route: '/tasks',
+      x: 160, y: 0, width: 75, height: 75, roofHeight: 60,
+      color: '#16a34a', accentColor: '#4ade80', icon: '🔧',
+      stats: { count: stats.tasks, label: 'pending' },
+    },
+    {
+      id: 'bank', name: 'BANCO', type: 'bank', route: '/finance',
+      x: 0, y: 160, width: 80, height: 80, roofHeight: 65,
+      color: '#ca8a04', accentColor: '#fbbf24', icon: '🏦',
+      stats: { count: stats.transactions, label: 'txs' },
+    },
+    {
+      id: 'library', name: 'BIBLIOTECA', type: 'library', route: '/ideas',
+      x: 160, y: 160, width: 75, height: 75, roofHeight: 60,
+      color: '#db2777', accentColor: '#f472b6', icon: '📚',
+      stats: { count: stats.ideas, label: 'ideas' },
+    },
+    {
+      id: 'tower', name: 'TORRE', type: 'tower', route: '/reminders',
+      x: 320, y: 80, width: 50, height: 50, roofHeight: 80,
+      color: '#7c3aed', accentColor: '#a78bfa', icon: '🗼',
+      stats: { count: stats.reminders, label: 'alerts' },
+    },
+    {
+      id: 'config', name: 'CONFIG', type: 'config', route: '/settings',
+      x: -120, y: 80, width: 55, height: 55, roofHeight: 50,
+      color: '#475569', accentColor: '#94a3b8', icon: '⚙️',
+    },
   ];
+
+  // Add log entry
+  const addLog = useCallback((action: string, type: LogEntry['type']) => {
+    const time = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    setLogs(prev => [{ time, action, type }, ...prev.slice(0, 4)]);
+  }, []);
+
+  // Ralph actions
+  const ralphSay = useCallback((message: string) => {
+    ralphRef.current.speechBubble = message;
+    ralphRef.current.speechTimer = 180; // 3 seconds at 60fps
+  }, []);
+
+  const ralphMoveTo = useCallback((building: Building) => {
+    ralphRef.current.targetX = building.x + Math.random() * 30 - 15;
+    ralphRef.current.targetY = building.y + Math.random() * 30 - 15;
+    ralphRef.current.state = 'walking';
+  }, []);
 
   // Load stats
   useEffect(() => {
@@ -321,32 +615,55 @@ export default function WorldPage() {
           transactions: financeStats.transactionCount,
         });
 
-        setTasks(taskList.filter(t => t.status === 'in_progress' || t.status === 'pending').slice(0, 5));
+        setTasks(taskList.filter(t => t.status === 'in_progress' || t.status === 'pending').slice(0, 6));
+        setCoins(taskStats.completed);
+
+        // Update energy based on time (simulated)
+        setEnergy(prev => ({
+          ...prev,
+          current: Math.min(prev.max, prev.current + 1),
+          rechargeTime: Math.max(0, prev.rechargeTime - 2),
+        }));
+
       } catch (e) {
         console.error('Error loading stats:', e);
       }
     }
-    loadStats();
-    const interval = setInterval(loadStats, 30000);
-    return () => clearInterval(interval);
-  }, []);
 
-  // Initialize agents from tasks
+    loadStats();
+    addLog('Sistema iniciado', 'system');
+    ralphSay('Hola! Estoy listo para trabajar');
+
+    const interval = setInterval(() => {
+      loadStats();
+      // Random Ralph behavior
+      if (Math.random() < 0.1) {
+        const randomBuilding = buildings[Math.floor(Math.random() * buildings.length)];
+        ralphMoveTo(randomBuilding);
+        addLog(`Caminando a ${randomBuilding.name}`, 'task');
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [addLog, ralphSay, ralphMoveTo]);
+
+  // Initialize task agents
   useEffect(() => {
-    const colors = ['#22c55e', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6'];
+    const colors = ['#22c55e', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4'];
     agentsRef.current = tasks.map((task, i) => {
-      const buildingIdx = Math.floor(Math.random() * 4) + 1;
-      const targetBuilding = buildings[buildingIdx];
+      const targetBuilding = buildings[1 + Math.floor(Math.random() * 4)]; // Skip HQ
       return {
         id: task.id,
         title: task.title,
-        x: Math.random() * 100 - 50,
-        y: Math.random() * 100 - 50,
+        x: 75 + Math.random() * 50 - 25,
+        y: 75 + Math.random() * 50 - 25,
         targetX: targetBuilding.x + Math.random() * 40 - 20,
         targetY: targetBuilding.y + Math.random() * 40 - 20,
-        speed: 0.5 + Math.random() * 0.5,
+        speed: 0.3 + Math.random() * 0.3,
         color: colors[i % colors.length],
         building: targetBuilding.id,
+        state: 'walking' as const,
+        celebrateTimer: 0,
       };
     });
   }, [tasks]);
@@ -360,12 +677,12 @@ export default function WorldPage() {
     if (!ctx) return;
 
     let animationId: number;
-    const scale = 1;
 
     function resize() {
       if (!canvas) return;
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+      const container = canvas.parentElement;
+      canvas.width = container?.clientWidth || window.innerWidth;
+      canvas.height = container?.clientHeight || window.innerHeight;
     }
 
     resize();
@@ -376,82 +693,114 @@ export default function WorldPage() {
 
       frameRef.current++;
       const frame = frameRef.current;
+      const scale = Math.min(canvas.width / 800, canvas.height / 600);
 
-      const offsetX = canvas.width / 2;
-      const offsetY = canvas.height / 2 - 50;
+      const offsetX = canvas.width / 2 - 50 * scale;
+      const offsetY = canvas.height / 2 - 80 * scale;
 
-      // Clear with dark background
-      ctx.fillStyle = '#0f172a';
+      // Background gradient
+      const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      gradient.addColorStop(0, '#0c1222');
+      gradient.addColorStop(1, '#1e293b');
+      ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Draw starfield
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-      for (let i = 0; i < 100; i++) {
-        const sx = (i * 137.5) % canvas.width;
-        const sy = (i * 97.3 + frame * 0.02) % canvas.height;
-        ctx.fillRect(sx, sy, 1, 1);
+      // Stars
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+      for (let i = 0; i < 80; i++) {
+        const sx = (i * 137.5 + frame * 0.01) % canvas.width;
+        const sy = (i * 97.3) % canvas.height;
+        const twinkle = Math.sin(frame * 0.05 + i) > 0.5 ? 1.5 : 1;
+        ctx.fillRect(sx, sy, twinkle, twinkle);
       }
 
-      // Draw ground grid
-      drawGround(ctx, offsetX, offsetY, scale, canvas.width, canvas.height);
+      // Ground
+      drawGround(ctx, offsetX, offsetY, scale);
 
-      // Sort buildings by depth for proper drawing order
+      // Sort entities by depth
       const sortedBuildings = [...buildings].sort((a, b) => (a.x + a.y) - (b.x + b.y));
 
       // Draw buildings
       for (const building of sortedBuildings) {
-        drawBuilding(ctx, building, offsetX, offsetY, scale, hoveredBuilding === building.id);
+        drawBuilding(ctx, building, offsetX, offsetY, scale, hoveredBuilding === building.id, frame);
       }
 
-      // Update and draw agents
-      for (const agent of agentsRef.current) {
-        // Move towards target
-        const dx = agent.targetX - agent.x;
-        const dy = agent.targetY - agent.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
+      // Update and draw Ralph
+      const ralph = ralphRef.current;
+      const rdx = ralph.targetX - ralph.x;
+      const rdy = ralph.targetY - ralph.y;
+      const rdist = Math.sqrt(rdx * rdx + rdy * rdy);
 
-        if (dist > 1) {
-          agent.x += (dx / dist) * agent.speed;
-          agent.y += (dy / dist) * agent.speed;
+      if (rdist > 2) {
+        ralph.x += (rdx / rdist) * 0.8;
+        ralph.y += (rdy / rdist) * 0.8;
+        ralph.state = 'walking';
+      } else {
+        if (ralph.state === 'walking') {
+          ralph.state = Math.random() < 0.3 ? 'building' : 'idle';
+          if (ralph.state === 'building') {
+            ralphSay('Trabajando en algo...');
+          }
+        }
+        // Occasionally change target
+        if (frame % 300 === 0 && Math.random() < 0.3) {
+          const randomBuilding = buildings[Math.floor(Math.random() * buildings.length)];
+          ralph.targetX = randomBuilding.x + Math.random() * 40 - 20;
+          ralph.targetY = randomBuilding.y + Math.random() * 40 - 20;
+        }
+      }
+
+      if (ralph.speechTimer > 0) {
+        ralph.speechTimer--;
+      }
+
+      drawRalph(ctx, ralph, offsetX, offsetY, scale, frame);
+
+      // Update and draw task agents
+      for (const agent of agentsRef.current) {
+        if (agent.state === 'celebrating') {
+          agent.celebrateTimer--;
+          if (agent.celebrateTimer <= 0) {
+            agent.state = 'walking';
+            const targetBuilding = buildings.find(b => b.id === agent.building);
+            if (targetBuilding) {
+              agent.targetX = targetBuilding.x + Math.random() * 40 - 20;
+              agent.targetY = targetBuilding.y + Math.random() * 40 - 20;
+            }
+          }
         } else {
-          // Reached target, pick new random target near same building
-          const building = buildings.find(b => b.id === agent.building);
-          if (building) {
-            agent.targetX = building.x + Math.random() * 60 - 30;
-            agent.targetY = building.y + Math.random() * 60 - 30;
+          const dx = agent.targetX - agent.x;
+          const dy = agent.targetY - agent.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist > 1) {
+            agent.x += (dx / dist) * agent.speed;
+            agent.y += (dy / dist) * agent.speed;
+            agent.state = 'walking';
+          } else {
+            agent.state = 'working';
+            if (frame % 500 === 0) {
+              const targetBuilding = buildings.find(b => b.id === agent.building);
+              if (targetBuilding) {
+                agent.targetX = targetBuilding.x + Math.random() * 50 - 25;
+                agent.targetY = targetBuilding.y + Math.random() * 50 - 25;
+              }
+            }
           }
         }
 
-        drawAgent(ctx, agent, offsetX, offsetY, scale, frame);
+        drawTaskAgent(ctx, agent, offsetX, offsetY, scale, frame);
       }
 
       // Update and draw particles
       particlesRef.current = particlesRef.current.filter(p => {
         p.x += p.vx;
         p.y += p.vy;
-        p.vy += 0.1;
-        p.life -= 0.02;
+        if (p.type !== 'coin') p.vy += 0.05;
+        p.life -= 0.015;
         return p.life > 0;
       });
       drawParticles(ctx, particlesRef.current, offsetX, offsetY, scale);
-
-      // Draw title
-      ctx.font = 'bold 28px "SF Mono", monospace';
-      ctx.fillStyle = '#fff';
-      ctx.textAlign = 'center';
-      ctx.fillText('OPTIMAI WORLD', canvas.width / 2, 50);
-
-      ctx.font = '14px "SF Mono", monospace';
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-      ctx.fillText('Click en un edificio para navegar', canvas.width / 2, 75);
-
-      // Draw mini stats
-      ctx.textAlign = 'left';
-      ctx.font = '12px "SF Mono", monospace';
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-      ctx.fillText(`Tareas activas: ${stats.tasks}`, 20, canvas.height - 60);
-      ctx.fillText(`Ideas pendientes: ${stats.ideas}`, 20, canvas.height - 40);
-      ctx.fillText(`Recordatorios: ${stats.reminders}`, 20, canvas.height - 20);
 
       animationId = requestAnimationFrame(animate);
     }
@@ -462,7 +811,7 @@ export default function WorldPage() {
       cancelAnimationFrame(animationId);
       window.removeEventListener('resize', resize);
     };
-  }, [hoveredBuilding, stats, buildings]);
+  }, [hoveredBuilding, buildings, ralphSay]);
 
   // Mouse interaction
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -473,11 +822,10 @@ export default function WorldPage() {
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
-    const offsetX = canvas.width / 2;
-    const offsetY = canvas.height / 2 - 50;
-    const scale = 1;
+    const scale = Math.min(canvas.width / 800, canvas.height / 600);
+    const offsetX = canvas.width / 2 - 50 * scale;
+    const offsetY = canvas.height / 2 - 80 * scale;
 
-    // Check which building is hovered
     let found: string | null = null;
     for (const building of buildings) {
       const iso = toIso(building.x, building.y);
@@ -486,12 +834,11 @@ export default function WorldPage() {
       const w = building.width * scale * 0.866;
       const h = building.height * scale * 0.5;
 
-      // Simple bounding box check
       if (
         mouseX >= screenX - w &&
         mouseX <= screenX + w &&
-        mouseY >= screenY &&
-        mouseY <= screenY + h * 2 + 60 * scale
+        mouseY >= screenY - 30 * scale &&
+        mouseY <= screenY + h * 2 + building.roofHeight * scale + 30 * scale
       ) {
         found = building.id;
         break;
@@ -500,80 +847,174 @@ export default function WorldPage() {
     setHoveredBuilding(found);
   }, [buildings]);
 
-  const handleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handleClick = useCallback(() => {
     if (hoveredBuilding) {
       const building = buildings.find(b => b.id === hoveredBuilding);
       if (building) {
-        // Spawn celebration particles
-        const iso = toIso(building.x, building.y);
-        for (let i = 0; i < 20; i++) {
+        // Particles
+        for (let i = 0; i < 15; i++) {
           particlesRef.current.push({
             x: building.x,
             y: building.y,
-            vx: (Math.random() - 0.5) * 3,
-            vy: -Math.random() * 3,
+            vx: (Math.random() - 0.5) * 2,
+            vy: -Math.random() * 2 - 1,
             life: 1,
-            color: building.color,
+            color: building.accentColor,
+            type: 'star',
           });
         }
 
-        // Navigate after a brief delay for effect
-        setTimeout(() => {
-          router.push(building.route);
-        }, 150);
+        // Energy cost
+        setEnergy(prev => ({ ...prev, current: Math.max(0, prev.current - 1) }));
+        addLog(`Visitando ${building.name}`, 'task');
+
+        setTimeout(() => router.push(building.route), 200);
       }
     }
-  }, [hoveredBuilding, buildings, router]);
+  }, [hoveredBuilding, buildings, router, addLog]);
+
+  const toggleFullscreen = () => {
+    setIsFullscreen(!isFullscreen);
+  };
 
   return (
-    <div className="relative w-full h-screen bg-slate-900 overflow-hidden">
-      <canvas
-        ref={canvasRef}
-        className="w-full h-full cursor-pointer"
-        style={{ cursor: hoveredBuilding ? 'pointer' : 'default' }}
-        onMouseMove={handleMouseMove}
-        onClick={handleClick}
-      />
+    <div className={`flex ${isFullscreen ? 'fixed inset-0 z-50' : 'h-screen'} bg-slate-900`}>
+      {/* Canvas container */}
+      <div className={`relative ${isFullscreen ? 'w-full' : 'flex-1'}`}>
+        <canvas
+          ref={canvasRef}
+          className="w-full h-full"
+          style={{ cursor: hoveredBuilding ? 'pointer' : 'default' }}
+          onMouseMove={handleMouseMove}
+          onClick={handleClick}
+        />
 
-      {/* Back button */}
-      <button
-        onClick={() => router.push('/')}
-        className="absolute top-4 left-4 px-4 py-2 bg-slate-800/80 hover:bg-slate-700 text-white rounded-lg transition-colors backdrop-blur-sm border border-slate-700"
-      >
-        ← Dashboard
-      </button>
-
-      {/* Legend */}
-      <div className="absolute bottom-4 right-4 p-4 bg-slate-800/80 backdrop-blur-sm rounded-lg border border-slate-700">
-        <h3 className="text-white font-semibold mb-2 text-sm">Leyenda</h3>
-        <div className="space-y-1 text-xs">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded bg-indigo-500"></div>
-            <span className="text-slate-300">Core / Dashboard</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded bg-green-500"></div>
-            <span className="text-slate-300">Tareas</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded bg-amber-500"></div>
-            <span className="text-slate-300">Finanzas</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded bg-pink-500"></div>
-            <span className="text-slate-300">Ideas</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded bg-violet-500"></div>
-            <span className="text-slate-300">Recordatorios</span>
-          </div>
+        {/* Title overlay */}
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 text-center">
+          <h1 className="text-2xl font-bold text-white tracking-wider">OPTIMAI WORLD</h1>
+          <p className="text-xs text-slate-400 mt-1">Click en un edificio para navegar</p>
         </div>
+
+        {/* Back button */}
+        {!isFullscreen && (
+          <button
+            onClick={() => router.push('/')}
+            className="absolute top-4 left-4 px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700 text-white text-sm rounded-lg transition-colors backdrop-blur-sm border border-slate-700"
+          >
+            ← Dashboard
+          </button>
+        )}
+
+        {/* Fullscreen toggle */}
+        <button
+          onClick={toggleFullscreen}
+          className="absolute top-4 right-4 p-2 bg-slate-800/80 hover:bg-slate-700 text-white rounded-lg transition-colors backdrop-blur-sm border border-slate-700"
+        >
+          {isFullscreen ? <X className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+        </button>
+
+        {/* Tooltip */}
+        {hoveredBuilding && (
+          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 px-4 py-2 bg-slate-800/90 backdrop-blur-sm rounded-lg border border-slate-600 text-white text-sm">
+            Click para ir a <strong>{buildings.find(b => b.id === hoveredBuilding)?.name}</strong>
+          </div>
+        )}
       </div>
 
-      {/* Tooltip for hovered building */}
-      {hoveredBuilding && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 px-4 py-2 bg-slate-800/90 backdrop-blur-sm rounded-lg border border-slate-600 text-white text-sm">
-          Click para ir a <strong>{buildings.find(b => b.id === hoveredBuilding)?.name}</strong>
+      {/* Side Panel */}
+      {!isFullscreen && (
+        <div className="w-72 bg-slate-800 border-l border-slate-700 p-4 flex flex-col gap-4 overflow-y-auto">
+          {/* Energy */}
+          <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700">
+            <div className="flex items-center gap-2 mb-2">
+              <Zap className="w-5 h-5 text-yellow-400" />
+              <span className="text-white font-semibold text-sm">Energía</span>
+              <span className="ml-auto text-yellow-400 font-mono text-sm">{energy.current}/{energy.max}</span>
+            </div>
+            <div className="w-full bg-slate-700 rounded-full h-2.5">
+              <div
+                className="bg-gradient-to-r from-yellow-500 to-amber-400 h-2.5 rounded-full transition-all"
+                style={{ width: `${(energy.current / energy.max) * 100}%` }}
+              />
+            </div>
+            <p className="text-xs text-slate-400 mt-1">API calls disponibles</p>
+          </div>
+
+          {/* Coins */}
+          <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700">
+            <div className="flex items-center gap-2">
+              <Coins className="w-5 h-5 text-amber-400" />
+              <span className="text-white font-semibold text-sm">Monedas</span>
+              <span className="ml-auto text-amber-400 font-mono text-lg">{coins}</span>
+            </div>
+            <p className="text-xs text-slate-400 mt-1">Tareas completadas hoy</p>
+          </div>
+
+          {/* Stats */}
+          <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700">
+            <div className="flex items-center gap-2 mb-3">
+              <Activity className="w-5 h-5 text-cyan-400" />
+              <span className="text-white font-semibold text-sm">Estado del Mundo</span>
+            </div>
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Tareas activas</span>
+                <span className="text-green-400 font-mono">{stats.tasks}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Ideas pendientes</span>
+                <span className="text-pink-400 font-mono">{stats.ideas}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Recordatorios</span>
+                <span className="text-violet-400 font-mono">{stats.reminders}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Transacciones</span>
+                <span className="text-amber-400 font-mono">{stats.transactions}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Ralph Activity Log */}
+          <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700 flex-1">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-5 h-5 rounded-full bg-cyan-500 flex items-center justify-center text-xs">R</div>
+              <span className="text-white font-semibold text-sm">Ralph Monitor</span>
+            </div>
+            <div className="space-y-2">
+              {logs.length === 0 ? (
+                <p className="text-slate-500 text-xs">Sin actividad reciente</p>
+              ) : (
+                logs.map((log, i) => (
+                  <div key={i} className="flex gap-2 text-xs">
+                    <span className="text-slate-500 font-mono">{log.time}</span>
+                    <span className={`${
+                      log.type === 'coin' ? 'text-amber-400' :
+                      log.type === 'energy' ? 'text-yellow-400' :
+                      log.type === 'system' ? 'text-cyan-400' :
+                      'text-slate-300'
+                    }`}>
+                      {log.action}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Legend */}
+          <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700">
+            <h3 className="text-white font-semibold text-xs mb-2">Edificios</h3>
+            <div className="grid grid-cols-2 gap-1 text-xs">
+              {buildings.map(b => (
+                <div key={b.id} className="flex items-center gap-1">
+                  <div className="w-2 h-2 rounded" style={{ backgroundColor: b.color }}></div>
+                  <span className="text-slate-400">{b.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>
