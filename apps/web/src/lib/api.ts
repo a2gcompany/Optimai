@@ -1,6 +1,101 @@
 // API client para comunicarse con Supabase directamente
 // Usa tablas existentes de Nucleus donde es posible
+// Para Ideas y Transactions que no existen aún, usa localStorage como fallback
 import { supabase, DbCategory } from './supabase';
+
+// Storage helpers for browser fallback
+const STORAGE_KEYS = {
+  ideas: 'optimai_ideas',
+  transactions: 'optimai_transactions',
+  categories: 'optimai_categories',
+};
+
+function getFromStorage<T>(key: string): T[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const data = localStorage.getItem(key);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveToStorage<T>(key: string, data: T[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (e) {
+    console.error('Error saving to localStorage:', e);
+  }
+}
+
+function generateId(): string {
+  return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+}
+
+// Initialize default categories if not present
+function initializeDefaultCategories(): DbCategory[] {
+  const existing = getFromStorage<DbCategory>(STORAGE_KEYS.categories);
+  if (existing.length > 0) return existing;
+
+  const defaults: DbCategory[] = [
+    { id: 'cat-1', name: 'Salario', type: 'income', color: '#22c55e', icon: 'banknotes', is_system: true, user_id: null, parent_id: null, created_at: new Date().toISOString() },
+    { id: 'cat-2', name: 'Freelance', type: 'income', color: '#10b981', icon: 'briefcase', is_system: true, user_id: null, parent_id: null, created_at: new Date().toISOString() },
+    { id: 'cat-3', name: 'Inversiones', type: 'income', color: '#14b8a6', icon: 'trending-up', is_system: true, user_id: null, parent_id: null, created_at: new Date().toISOString() },
+    { id: 'cat-4', name: 'Alimentación', type: 'expense', color: '#f59e0b', icon: 'utensils', is_system: true, user_id: null, parent_id: null, created_at: new Date().toISOString() },
+    { id: 'cat-5', name: 'Transporte', type: 'expense', color: '#3b82f6', icon: 'car', is_system: true, user_id: null, parent_id: null, created_at: new Date().toISOString() },
+    { id: 'cat-6', name: 'Vivienda', type: 'expense', color: '#8b5cf6', icon: 'home', is_system: true, user_id: null, parent_id: null, created_at: new Date().toISOString() },
+    { id: 'cat-7', name: 'Entretenimiento', type: 'expense', color: '#ec4899', icon: 'gamepad-2', is_system: true, user_id: null, parent_id: null, created_at: new Date().toISOString() },
+    { id: 'cat-8', name: 'Salud', type: 'expense', color: '#ef4444', icon: 'heart-pulse', is_system: true, user_id: null, parent_id: null, created_at: new Date().toISOString() },
+    { id: 'cat-9', name: 'Suscripciones', type: 'expense', color: '#a855f7', icon: 'repeat', is_system: true, user_id: null, parent_id: null, created_at: new Date().toISOString() },
+    { id: 'cat-10', name: 'Software', type: 'expense', color: '#6366f1', icon: 'code', is_system: true, user_id: null, parent_id: null, created_at: new Date().toISOString() },
+    { id: 'cat-11', name: 'Marketing', type: 'expense', color: '#f43f5e', icon: 'megaphone', is_system: true, user_id: null, parent_id: null, created_at: new Date().toISOString() },
+    { id: 'cat-12', name: 'Viajes', type: 'expense', color: '#0ea5e9', icon: 'plane', is_system: true, user_id: null, parent_id: null, created_at: new Date().toISOString() },
+    { id: 'cat-13', name: 'Artistas', type: 'income', color: '#8b5cf6', icon: 'music', is_system: true, user_id: null, parent_id: null, created_at: new Date().toISOString() },
+    { id: 'cat-14', name: 'Otros', type: 'expense', color: '#64748b', icon: 'more-horizontal', is_system: true, user_id: null, parent_id: null, created_at: new Date().toISOString() },
+  ];
+  saveToStorage(STORAGE_KEYS.categories, defaults);
+  return defaults;
+}
+
+// Initialize sample data for demo
+function initializeSampleTransactions(): Transaction[] {
+  const existing = getFromStorage<Transaction>(STORAGE_KEYS.transactions);
+  if (existing.length > 0) return existing;
+
+  const samples: Transaction[] = [
+    { id: 'tx-1', amount: 5000, currency: 'EUR', type: 'income', description: 'Booking Roger Sanchez - Ushuaia', category: 'Artistas', category_id: 'cat-13', date: '2026-01-20' },
+    { id: 'tx-2', amount: 1250.50, currency: 'EUR', type: 'expense', description: 'Publicidad Meta - PAIDDADS', category: 'Marketing', category_id: 'cat-11', date: '2026-01-19' },
+    { id: 'tx-3', amount: 2500, currency: 'EUR', type: 'income', description: 'Comisión Prophecy - Ultra', category: 'Artistas', category_id: 'cat-13', date: '2026-01-18' },
+    { id: 'tx-4', amount: 89.99, currency: 'EUR', type: 'expense', description: 'Suscripción OpenAI API', category: 'Software', category_id: 'cat-10', date: '2026-01-17' },
+    { id: 'tx-5', amount: 350, currency: 'EUR', type: 'expense', description: 'Vuelo Madrid-Ibiza', category: 'Viajes', category_id: 'cat-12', date: '2026-01-16' },
+    { id: 'tx-6', amount: 15000, currency: 'EUR', type: 'income', description: 'Pago mensual A2G FZCO', category: 'Salario', category_id: 'cat-1', date: '2026-01-01' },
+    { id: 'tx-7', amount: 2500, currency: 'EUR', type: 'expense', description: 'Alquiler oficina Dubai', category: 'Vivienda', category_id: 'cat-6', date: '2026-01-05' },
+    { id: 'tx-8', amount: 199, currency: 'EUR', type: 'expense', description: 'Vercel Pro + Supabase', category: 'Software', category_id: 'cat-10', date: '2026-01-10' },
+    { id: 'tx-9', amount: 800, currency: 'EUR', type: 'income', description: 'Consultoría EMVI', category: 'Freelance', category_id: 'cat-2', date: '2026-01-12' },
+    { id: 'tx-10', amount: 45, currency: 'EUR', type: 'expense', description: 'Cena networking', category: 'Alimentación', category_id: 'cat-4', date: '2026-01-15' },
+  ];
+  saveToStorage(STORAGE_KEYS.transactions, samples);
+  return samples;
+}
+
+function initializeSampleIdeas(): Idea[] {
+  const existing = getFromStorage<Idea>(STORAGE_KEYS.ideas);
+  if (existing.length > 0) return existing;
+
+  const samples: Idea[] = [
+    { id: 'idea-1', title: 'Integrar con Stripe para pagos', description: 'Conectar el sistema de pagos de S-CORE con Stripe para procesar suscripciones', category: 'feature', status: 'planned', priority: 3, effort: 'l', impact: 'critical', tags: ['stripe', 's-core', 'payments'], votes: 5, created_at: '2026-01-15T10:00:00Z' },
+    { id: 'idea-2', title: 'Dashboard de métricas de artistas', description: 'Panel para ver estadísticas de Roger Sanchez, Prophecy y BABEL', category: 'feature', status: 'backlog', priority: 2, effort: 'm', impact: 'high', tags: ['a2g-talents', 'analytics'], votes: 3, created_at: '2026-01-14T10:00:00Z' },
+    { id: 'idea-3', title: 'Optimizar carga del dashboard', description: 'El dashboard tarda en cargar, revisar queries de Supabase', category: 'improvement', status: 'evaluating', priority: 1, effort: 's', impact: 'medium', tags: ['performance'], votes: 2, created_at: '2026-01-13T10:00:00Z' },
+    { id: 'idea-4', title: 'Bot de Telegram no responde a fotos', description: 'Cuando se envía una foto, el bot no procesa el mensaje', category: 'bugfix', status: 'in_progress', priority: 2, effort: 's', impact: 'medium', tags: ['telegram', 'bug'], votes: 4, created_at: '2026-01-12T10:00:00Z' },
+    { id: 'idea-5', title: 'Investigar Web3 para tips de fans', description: 'Estudiar cómo implementar pagos crypto en Tipit', category: 'research', status: 'backlog', priority: 0, effort: 'xl', impact: 'high', tags: ['web3', 'tipit'], votes: 1, created_at: '2026-01-11T10:00:00Z' },
+    { id: 'idea-6', title: 'Sistema de notificaciones push', description: 'Implementar notificaciones para recordatorios importantes', category: 'feature', status: 'backlog', priority: 1, effort: 'm', impact: 'medium', tags: ['notifications'], votes: 2, created_at: '2026-01-10T10:00:00Z' },
+    { id: 'idea-7', title: 'Integración con Shopify', description: 'Conectar métricas de tiendas de merchandising de artistas', category: 'feature', status: 'evaluating', priority: 2, effort: 'l', impact: 'high', tags: ['shopify', 'e-commerce'], votes: 3, created_at: '2026-01-09T10:00:00Z' },
+    { id: 'idea-8', title: 'Mejorar UX del formulario de tareas', description: 'Añadir autocompletado y validación inline', category: 'improvement', status: 'done', priority: 1, effort: 's', impact: 'medium', tags: ['ux', 'forms'], votes: 2, created_at: '2026-01-08T10:00:00Z' },
+  ];
+  saveToStorage(STORAGE_KEYS.ideas, samples);
+  return samples;
+}
 
 export interface DashboardStats {
   tasks: {
@@ -104,6 +199,16 @@ function mapDevTaskPriority(priority: string): Task['priority'] {
 }
 
 class APIClient {
+  private initialized = false;
+
+  private ensureInitialized() {
+    if (this.initialized || typeof window === 'undefined') return;
+    initializeDefaultCategories();
+    initializeSampleTransactions();
+    initializeSampleIdeas();
+    this.initialized = true;
+  }
+
   // Tasks - Using Nucleus dev_tasks table
   async getTasks(limit = 10): Promise<Task[]> {
     const { data, error } = await supabase
@@ -203,102 +308,77 @@ class APIClient {
     return !error;
   }
 
-  // Finance - Using optimai_transactions table (may not exist yet)
+  // Finance - Using localStorage (optimai_transactions table doesn't exist)
   async getTransactions(limit = 10): Promise<Transaction[]> {
-    const { data, error } = await supabase
-      .from('optimai_transactions')
-      .select('*, optimai_categories(name)')
-      .order('date', { ascending: false })
-      .limit(limit);
-
-    if (error) {
-      console.error('Error fetching transactions:', error);
-      // Return empty - table may not exist
-      return [];
-    }
-
-    return (data || []).map((t: Record<string, unknown>) => ({
-      id: t.id as string,
-      amount: t.amount as number,
-      currency: (t.currency as string) || 'EUR',
-      type: t.type as 'income' | 'expense' | 'transfer',
-      description: t.description as string | undefined,
-      category: ((t.optimai_categories as { name?: string })?.name as string) || 'Sin categoría',
-      category_id: t.category_id as string | undefined,
-      date: t.date as string,
-    }));
+    this.ensureInitialized();
+    const txs = getFromStorage<Transaction>(STORAGE_KEYS.transactions);
+    // Sort by date descending
+    txs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return txs.slice(0, limit);
   }
 
   async getFinanceSummary(period = 'month'): Promise<DashboardStats['finance']> {
+    this.ensureInitialized();
+    const txs = getFromStorage<Transaction>(STORAGE_KEYS.transactions);
+
     const now = new Date();
-    let startDate: string;
+    let startDate: Date;
 
     if (period === 'month') {
-      startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
     } else if (period === 'year') {
-      startDate = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
+      startDate = new Date(now.getFullYear(), 0, 1);
     } else {
-      startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     }
 
-    const { data, error } = await supabase
-      .from('optimai_transactions')
-      .select('amount, type')
-      .gte('date', startDate);
+    const filtered = txs.filter(t => new Date(t.date) >= startDate);
 
-    if (error || !data) {
-      return { totalIncome: 0, totalExpenses: 0, net: 0, transactionCount: 0 };
-    }
-
-    const totalIncome = data.filter((t) => t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0);
-    const totalExpenses = data
-      .filter((t) => t.type === 'expense')
-      .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0);
+    const totalIncome = filtered.filter((t) => t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0);
+    const totalExpenses = filtered.filter((t) => t.type === 'expense').reduce((sum, t) => sum + Number(t.amount), 0);
 
     return {
       totalIncome,
       totalExpenses,
       net: totalIncome - totalExpenses,
-      transactionCount: data.length,
+      transactionCount: filtered.length,
     };
   }
 
   async getCategories(): Promise<DbCategory[]> {
-    const { data, error } = await supabase.from('optimai_categories').select('*').order('name');
-
-    if (error) {
-      console.error('Error fetching categories:', error);
-      // Return default categories
-      return [
-        { id: '1', name: 'Alimentación', type: 'expense', color: '#f59e0b', icon: 'utensils', is_system: true, user_id: null, parent_id: null, created_at: '' },
-        { id: '2', name: 'Transporte', type: 'expense', color: '#3b82f6', icon: 'car', is_system: true, user_id: null, parent_id: null, created_at: '' },
-        { id: '3', name: 'Salario', type: 'income', color: '#22c55e', icon: 'banknotes', is_system: true, user_id: null, parent_id: null, created_at: '' },
-        { id: '4', name: 'Otros', type: 'expense', color: '#64748b', icon: 'more-horizontal', is_system: true, user_id: null, parent_id: null, created_at: '' },
-      ];
-    }
-    return data || [];
+    this.ensureInitialized();
+    return getFromStorage<DbCategory>(STORAGE_KEYS.categories);
   }
 
   async createTransaction(tx: Omit<Transaction, 'id'>): Promise<Transaction | null> {
-    const { data, error } = await supabase
-      .from('optimai_transactions')
-      .insert({
-        amount: tx.amount,
-        currency: tx.currency || 'EUR',
-        type: tx.type,
-        description: tx.description,
-        category_id: tx.category_id,
-        date: tx.date,
-        user_id: '00000000-0000-0000-0000-000000000000',
-      })
-      .select()
-      .single();
+    this.ensureInitialized();
+    const txs = getFromStorage<Transaction>(STORAGE_KEYS.transactions);
 
-    if (error) {
-      console.error('Error creating transaction:', error);
-      return null;
-    }
-    return data;
+    // Find category name
+    const categories = getFromStorage<DbCategory>(STORAGE_KEYS.categories);
+    const cat = categories.find(c => c.id === tx.category_id);
+
+    const newTx: Transaction = {
+      id: generateId(),
+      amount: tx.amount,
+      currency: tx.currency || 'EUR',
+      type: tx.type,
+      description: tx.description,
+      category: cat?.name || tx.category,
+      category_id: tx.category_id,
+      date: tx.date,
+    };
+
+    txs.unshift(newTx);
+    saveToStorage(STORAGE_KEYS.transactions, txs);
+    return newTx;
+  }
+
+  async deleteTransaction(id: string): Promise<boolean> {
+    const txs = getFromStorage<Transaction>(STORAGE_KEYS.transactions);
+    const filtered = txs.filter(t => t.id !== id);
+    saveToStorage(STORAGE_KEYS.transactions, filtered);
+    return true;
   }
 
   // Reminders - Using Nucleus reminders table
@@ -362,7 +442,7 @@ class APIClient {
   }
 
   async createReminder(reminder: { title: string; due_date?: string; priority?: number }): Promise<Reminder | null> {
-    const id = `rem-${Buffer.from(reminder.title.substring(0, 20)).toString('base64').replace(/[+/=]/g, '')}`;
+    const id = `rem-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
     const { data, error } = await supabase
       .from('reminders')
@@ -421,65 +501,16 @@ class APIClient {
     return !error;
   }
 
-  // Ideas - Using optimai_ideas table (may not exist yet)
+  // Ideas - Using localStorage (optimai_ideas table doesn't exist)
   async getIdeas(limit = 50): Promise<Idea[]> {
-    const { data, error } = await supabase
-      .from('optimai_ideas')
-      .select('*')
-      .order('priority', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(limit);
-
-    if (error) {
-      console.error('Error fetching ideas:', error);
-      // Table doesn't exist - return dev_tasks as ideas fallback
-      return this.getDevTasksAsIdeas();
-    }
-
-    return (data || []).map((i) => ({
-      id: i.id,
-      title: i.title,
-      description: i.description,
-      category: i.category || 'feature',
-      status: i.status || 'backlog',
-      priority: i.priority || 0,
-      effort: i.effort,
-      impact: i.impact,
-      tags: i.tags || [],
-      votes: i.votes || 0,
-      created_at: i.created_at,
-      updated_at: i.updated_at,
-    }));
-  }
-
-  // Fallback: use dev_tasks as ideas
-  private async getDevTasksAsIdeas(): Promise<Idea[]> {
-    const { data, error } = await supabase
-      .from('dev_tasks')
-      .select('*')
-      .order('priority', { ascending: false })
-      .limit(50);
-
-    if (error || !data) return [];
-
-    const statusMap: Record<string, Idea['status']> = {
-      pending: 'backlog',
-      in_progress: 'in_progress',
-      completed: 'done',
-    };
-
-    return data.map((t) => ({
-      id: t.id,
-      title: t.title,
-      description: t.description,
-      category: 'feature' as const,
-      status: statusMap[t.status] || 'backlog',
-      priority: t.priority === 'high' ? 3 : t.priority === 'medium' ? 2 : 1,
-      tags: [],
-      votes: 0,
-      created_at: t.created_at,
-      updated_at: t.updated_at,
-    }));
+    this.ensureInitialized();
+    const ideas = getFromStorage<Idea>(STORAGE_KEYS.ideas);
+    // Sort by priority then by date
+    ideas.sort((a, b) => {
+      if (b.priority !== a.priority) return b.priority - a.priority;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+    return ideas.slice(0, limit);
   }
 
   async getIdeasByStatus(status: Idea['status']): Promise<Idea[]> {
@@ -488,153 +519,58 @@ class APIClient {
   }
 
   async createIdea(idea: Omit<Idea, 'id' | 'created_at' | 'votes'>): Promise<Idea | null> {
-    const { data, error } = await supabase
-      .from('optimai_ideas')
-      .insert({
-        title: idea.title,
-        description: idea.description,
-        category: idea.category,
-        status: idea.status,
-        priority: idea.priority,
-        effort: idea.effort,
-        impact: idea.impact,
-        tags: idea.tags || [],
-        votes: 0,
-        user_id: '00000000-0000-0000-0000-000000000000',
-      })
-      .select()
-      .single();
+    this.ensureInitialized();
+    const ideas = getFromStorage<Idea>(STORAGE_KEYS.ideas);
 
-    if (error) {
-      console.error('Error creating idea:', error);
-      // Fallback to dev_tasks
-      return this.createIdeaAsDevTask(idea);
-    }
-
-    return {
-      id: data.id,
-      title: data.title,
-      description: data.description,
-      category: data.category,
-      status: data.status,
-      priority: data.priority,
-      effort: data.effort,
-      impact: data.impact,
-      tags: data.tags || [],
-      votes: data.votes || 0,
-      created_at: data.created_at,
-      updated_at: data.updated_at,
-    };
-  }
-
-  private async createIdeaAsDevTask(
-    idea: Omit<Idea, 'id' | 'created_at' | 'votes'>
-  ): Promise<Idea | null> {
-    const statusMap: Record<Idea['status'], string> = {
-      backlog: 'pending',
-      evaluating: 'pending',
-      planned: 'pending',
-      in_progress: 'in_progress',
-      done: 'completed',
-      rejected: 'completed',
-    };
-
-    const { data, error } = await supabase
-      .from('dev_tasks')
-      .insert({
-        title: idea.title,
-        description: idea.description,
-        status: statusMap[idea.status] || 'pending',
-        priority: idea.priority >= 3 ? 'high' : idea.priority >= 2 ? 'medium' : 'low',
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error creating idea as dev_task:', error);
-      return null;
-    }
-
-    return {
-      id: data.id,
-      title: data.title,
-      description: data.description,
-      category: 'feature',
-      status: 'backlog',
+    const newIdea: Idea = {
+      id: generateId(),
+      title: idea.title,
+      description: idea.description,
+      category: idea.category,
+      status: idea.status,
       priority: idea.priority,
-      tags: [],
+      effort: idea.effort,
+      impact: idea.impact,
+      tags: idea.tags || [],
       votes: 0,
-      created_at: data.created_at,
+      created_at: new Date().toISOString(),
     };
+
+    ideas.unshift(newIdea);
+    saveToStorage(STORAGE_KEYS.ideas, ideas);
+    return newIdea;
   }
 
   async updateIdea(id: string, updates: Partial<Idea>): Promise<Idea | null> {
-    // Try optimai_ideas first
-    const { data, error } = await supabase.from('optimai_ideas').update(updates).eq('id', id).select().single();
+    const ideas = getFromStorage<Idea>(STORAGE_KEYS.ideas);
+    const index = ideas.findIndex(i => i.id === id);
+    if (index === -1) return null;
 
-    if (error) {
-      // Fallback to dev_tasks
-      const devUpdates: Record<string, unknown> = {};
-      if (updates.title) devUpdates.title = updates.title;
-      if (updates.description !== undefined) devUpdates.description = updates.description;
-      if (updates.status) {
-        const statusMap: Record<Idea['status'], string> = {
-          backlog: 'pending',
-          evaluating: 'pending',
-          planned: 'pending',
-          in_progress: 'in_progress',
-          done: 'completed',
-          rejected: 'completed',
-        };
-        devUpdates.status = statusMap[updates.status];
-      }
+    ideas[index] = {
+      ...ideas[index],
+      ...updates,
+      updated_at: new Date().toISOString(),
+    };
 
-      const { data: devData, error: devError } = await supabase
-        .from('dev_tasks')
-        .update(devUpdates)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (devError) return null;
-      return {
-        id: devData.id,
-        title: devData.title,
-        description: devData.description,
-        category: 'feature',
-        status: 'backlog',
-        priority: 0,
-        tags: [],
-        votes: 0,
-        created_at: devData.created_at,
-      };
-    }
-
-    return data;
+    saveToStorage(STORAGE_KEYS.ideas, ideas);
+    return ideas[index];
   }
 
   async deleteIdea(id: string): Promise<boolean> {
-    // Try optimai_ideas first
-    const { error } = await supabase.from('optimai_ideas').delete().eq('id', id);
-    if (error) {
-      // Fallback to dev_tasks
-      const { error: devError } = await supabase.from('dev_tasks').delete().eq('id', id);
-      return !devError;
-    }
+    const ideas = getFromStorage<Idea>(STORAGE_KEYS.ideas);
+    const filtered = ideas.filter(i => i.id !== id);
+    saveToStorage(STORAGE_KEYS.ideas, filtered);
     return true;
   }
 
   async voteIdea(id: string, delta: number): Promise<boolean> {
-    const { data: current } = await supabase.from('optimai_ideas').select('votes').eq('id', id).single();
+    const ideas = getFromStorage<Idea>(STORAGE_KEYS.ideas);
+    const index = ideas.findIndex(i => i.id === id);
+    if (index === -1) return false;
 
-    if (!current) return false;
-
-    const { error } = await supabase
-      .from('optimai_ideas')
-      .update({ votes: (current.votes || 0) + delta })
-      .eq('id', id);
-
-    return !error;
+    ideas[index].votes = Math.max(0, (ideas[index].votes || 0) + delta);
+    saveToStorage(STORAGE_KEYS.ideas, ideas);
+    return true;
   }
 
   // Combined dashboard data
@@ -668,3 +604,4 @@ class APIClient {
 }
 
 export const api = new APIClient();
+export { DbCategory };
