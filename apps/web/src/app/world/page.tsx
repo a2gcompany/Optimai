@@ -1336,7 +1336,9 @@ export default function WorldPage() {
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
-    const scale = Math.min(canvas.width / 800, canvas.height / 600);
+    // Must match the scale calculation in the render loop for pueblo mode
+    const baseScale = 1; // pueblo mode
+    const scale = Math.min(canvas.width / 800, canvas.height / 600) * baseScale;
     const offsetX = canvas.width / 2 - 50 * scale;
     const offsetY = canvas.height / 2 - 80 * scale;
 
@@ -1440,7 +1442,7 @@ export default function WorldPage() {
         {!isFullscreen && (
           <button
             onClick={() => router.push('/')}
-            className="absolute top-4 left-4 px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700 text-white text-sm rounded-lg transition-colors backdrop-blur-sm border border-slate-700"
+            className="absolute top-4 left-4 z-10 px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700 text-white text-sm rounded-lg transition-colors backdrop-blur-sm border border-slate-700"
           >
             ← Dashboard
           </button>
@@ -1449,7 +1451,7 @@ export default function WorldPage() {
         {/* View toggle */}
         <button
           onClick={() => setViewMode(viewMode === 'country' ? 'pueblo' : 'country')}
-          className="absolute top-16 left-4 px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700 text-white text-sm rounded-lg transition-colors backdrop-blur-sm border border-slate-700 flex items-center gap-2"
+          className="absolute top-16 left-4 z-10 px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700 text-white text-sm rounded-lg transition-colors backdrop-blur-sm border border-slate-700 flex items-center gap-2"
         >
           {viewMode === 'country' ? <Users className="w-4 h-4" /> : <Map className="w-4 h-4" />}
           {viewMode === 'country' ? 'Mi Pueblo' : 'País'}
@@ -1458,7 +1460,7 @@ export default function WorldPage() {
         {/* Fullscreen toggle */}
         <button
           onClick={toggleFullscreen}
-          className="absolute top-4 right-4 p-2 bg-slate-800/80 hover:bg-slate-700 text-white rounded-lg transition-colors backdrop-blur-sm border border-slate-700"
+          className="absolute top-4 right-4 z-10 p-2 bg-slate-800/80 hover:bg-slate-700 text-white rounded-lg transition-colors backdrop-blur-sm border border-slate-700"
         >
           {isFullscreen ? <X className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
         </button>
