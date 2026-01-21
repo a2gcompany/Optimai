@@ -44,7 +44,7 @@ interface RalphState {
   y: number;
   targetX: number;
   targetY: number;
-  state: 'idle' | 'walking' | 'building' | 'thinking';
+  state: 'idle' | 'walking' | 'building' | 'thinking' | 'disconnected';
   currentTask: string;
   speechBubble: string;
   speechTimer: number;
@@ -73,7 +73,7 @@ interface LogEntry {
 }
 
 interface RalphAPIResponse {
-  state: 'idle' | 'walking' | 'building' | 'thinking';
+  state: 'idle' | 'walking' | 'building' | 'thinking' | 'disconnected';
   currentTask: string;
   speechBubble: string;
   energy: EnergySystem;
@@ -86,6 +86,8 @@ interface RalphAPIResponse {
     callsThisHour: number;
   };
   recentActivity: LogEntry[];
+  source?: 'local' | 'supabase' | 'fallback';
+  pueblo?: string;
 }
 
 // ============================================================================
@@ -385,14 +387,15 @@ function drawRalph(
     walking: '#3b82f6',
     building: '#22c55e',
     thinking: '#f59e0b',
+    disconnected: '#64748b',
   };
-  const glowColor = glowColors[ralph.state];
+  const glowColor = glowColors[ralph.state] || '#64748b';
 
   ctx.shadowColor = glowColor;
-  ctx.shadowBlur = 10;
+  ctx.shadowBlur = ralph.state === 'disconnected' ? 5 : 10;
 
-  // Body
-  ctx.fillStyle = '#06b6d4';
+  // Body - greyed out if disconnected
+  ctx.fillStyle = ralph.state === 'disconnected' ? '#64748b' : '#06b6d4';
   ctx.fillRect(screenX - size / 2, screenY - size + bob, size, size * 1.4);
   ctx.shadowBlur = 0;
 
@@ -415,7 +418,9 @@ function drawRalph(
   ctx.stroke();
 
   // Antenna light with glow
-  const lightColor = ralph.state === 'building' ? '#22c55e' : (ralph.state === 'thinking' ? '#f59e0b' : '#3b82f6');
+  const lightColor = ralph.state === 'disconnected' ? '#ef4444' :
+    ralph.state === 'building' ? '#22c55e' :
+    ralph.state === 'thinking' ? '#f59e0b' : '#3b82f6';
   ctx.fillStyle = lightColor;
   ctx.shadowColor = lightColor;
   ctx.shadowBlur = 8;
@@ -616,6 +621,8 @@ export default function WorldPage() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isConnected, setIsConnected] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [dataSource, setDataSource] = useState<'local' | 'supabase' | 'fallback'>('fallback');
+  const [puebloName, setPuebloName] = useState<string>('Aitzol');
 
   const frameRef = useRef(0);
   const agentsRef = useRef<TaskAgent[]>([]);
@@ -721,11 +728,19 @@ export default function WorldPage() {
         setLogs(data.recentActivity);
       }
 
-      setIsConnected(true);
+      // Update source and pueblo
+      if (data.source) setDataSource(data.source);
+      if (data.pueblo) setPuebloName(data.pueblo);
+
+      setIsConnected(data.state !== 'disconnected');
       setLastUpdate(new Date());
     } catch (error) {
       console.error('Error fetching Ralph status:', error);
       setIsConnected(false);
+      setDataSource('fallback');
+      ralphRef.current.state = 'disconnected';
+      ralphRef.current.speechBubble = 'Sin conexión...';
+      ralphRef.current.speechTimer = 300;
     }
   }, [ralphSay]);
 
@@ -1030,16 +1045,18 @@ export default function WorldPage() {
 
         {/* Title overlay */}
         <div className="absolute top-4 left-1/2 -translate-x-1/2 text-center">
-          <h1 className="text-2xl font-bold text-white tracking-wider">OPTIMAI WORLD</h1>
+          <h1 className="text-2xl font-bold text-white tracking-wider">PUEBLO DE {puebloName.toUpperCase()}</h1>
           <p className="text-xs text-slate-400 mt-1">Click en un edificio para navegar</p>
         </div>
 
         {/* Connection status */}
         <div className={`absolute top-4 left-1/2 translate-x-20 flex items-center gap-2 px-2 py-1 rounded-full text-xs ${
-          isConnected ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+          isConnected ? (dataSource === 'local' ? 'bg-cyan-500/20 text-cyan-400' : 'bg-green-500/20 text-green-400') : 'bg-red-500/20 text-red-400'
         }`}>
-          <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
-          {isConnected ? 'Conectado' : 'Sin conexión'}
+          <div className={`w-2 h-2 rounded-full ${
+            isConnected ? (dataSource === 'local' ? 'bg-cyan-400' : 'bg-green-400') : 'bg-red-400'
+          } ${isConnected ? 'animate-pulse' : ''}`} />
+          {isConnected ? (dataSource === 'local' ? 'Local' : dataSource === 'supabase' ? 'Nube' : 'Fallback') : 'Sin conexión'}
         </div>
 
         {/* Back button */}
@@ -1138,9 +1155,12 @@ export default function WorldPage() {
                   ralphRef.current.state === 'building' ? 'bg-green-400' :
                   ralphRef.current.state === 'thinking' ? 'bg-yellow-400' :
                   ralphRef.current.state === 'walking' ? 'bg-blue-400' :
+                  ralphRef.current.state === 'disconnected' ? 'bg-red-400' :
                   'bg-slate-400'
                 }`} />
-                <span className="text-slate-300 capitalize">{ralphRef.current.state}</span>
+                <span className={`capitalize ${ralphRef.current.state === 'disconnected' ? 'text-red-400' : 'text-slate-300'}`}>
+                  {ralphRef.current.state === 'disconnected' ? 'Desconectado' : ralphRef.current.state}
+                </span>
               </div>
               {ralphRef.current.currentTask && (
                 <p className="text-xs text-slate-400 mt-1 truncate">{ralphRef.current.currentTask}</p>

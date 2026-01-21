@@ -38,3 +38,10 @@
 - [ ] Lee archivos locales (status.json, logs)
 - [ ] Claude como backend de análisis
 - [ ] Datos sensibles nunca salen del Mac
+
+## MEJORAR RALPH MONITOR
+- [ ] Mostrar tarea actual en progreso
+- [ ] Parsear último log de Claude para última acción
+- [ ] Checklist visual de @fix_plan.md (completadas/pendientes)
+- [ ] Barra de progreso del plan
+- [ ] Actualizar ~/.ralph/ralph_monitor.sh

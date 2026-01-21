@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { promises as fs } from 'fs';
+import path from 'path';
 
-// API Version: 1.0.0 - Real-time Ralph status
+// API Version: 2.0.0 - Local-first Ralph status with Supabase fallback
 
-// Supabase client
+// Supabase client (for shared data only)
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
@@ -11,7 +13,7 @@ const supabase = createClient(
 
 // Ralph state types
 interface RalphStatus {
-  state: 'idle' | 'walking' | 'building' | 'thinking';
+  state: 'idle' | 'walking' | 'building' | 'thinking' | 'disconnected';
   currentTask: string;
   speechBubble: string;
   energy: {
@@ -32,31 +34,58 @@ interface RalphStatus {
     action: string;
     type: 'task' | 'energy' | 'coin' | 'system';
   }>;
+  source: 'local' | 'supabase' | 'fallback';
+  pueblo: string;
 }
 
-// Map last_action to Ralph state
-function mapActionToState(action: string): RalphStatus['state'] {
-  switch (action) {
+interface LocalStatus {
+  timestamp: string;
+  loop_count: number;
+  calls_made_this_hour: number;
+  max_calls_per_hour: number;
+  last_action: string;
+  status: string;
+  exit_reason: string;
+  next_reset: string;
+}
+
+interface LocalProgress {
+  status: string;
+  indicator: string;
+  elapsed_seconds: number;
+  last_output: string;
+  timestamp: string;
+}
+
+// Map local status to Ralph state
+function mapStatusToState(status: string, lastAction: string): RalphStatus['state'] {
+  if (status === 'stopped' || status === 'error') return 'disconnected';
+  if (status === 'paused') return 'idle';
+
+  switch (lastAction) {
     case 'executing':
     case 'processing':
+    case 'building':
       return 'building';
     case 'thinking':
     case 'analyzing':
+    case 'planning':
       return 'thinking';
     case 'moving':
     case 'navigating':
       return 'walking';
     default:
-      return 'idle';
+      return status === 'running' ? 'building' : 'idle';
   }
 }
 
 // Get speech bubble based on state
-function getSpeechBubble(action: string, status: string): string {
-  if (status === 'error') return 'Algo salió mal...';
+function getSpeechBubble(state: RalphStatus['state'], lastAction: string, status: string): string {
+  if (state === 'disconnected') return 'Desconectado...';
   if (status === 'paused') return 'Tomando un descanso';
+  if (status === 'error') return 'Algo salió mal...';
 
-  switch (action) {
+  switch (lastAction) {
     case 'executing':
       return 'Ejecutando tareas...';
     case 'processing':
@@ -65,17 +94,62 @@ function getSpeechBubble(action: string, status: string): string {
       return 'Analizando opciones...';
     case 'analyzing':
       return 'Revisando código...';
+    case 'building':
+      return 'Construyendo algo...';
     default:
-      return 'Todo bajo control';
+      return state === 'building' ? 'Trabajando...' : 'Todo bajo control';
   }
 }
 
-export async function GET() {
+// Try to read local status files
+async function readLocalStatus(): Promise<{ status: LocalStatus | null; progress: LocalProgress | null }> {
   try {
-    // Try to read status from local files (if exists in server)
-    // For production, we'll use Supabase data
+    // Try multiple possible paths for status.json
+    const possiblePaths = [
+      path.join(process.cwd(), '..', '..', 'status.json'),
+      path.join(process.cwd(), 'status.json'),
+      '/Users/a2g/Projects/Optimai/status.json',
+    ];
 
-    // Get task stats from Supabase
+    let statusData: LocalStatus | null = null;
+    let progressData: LocalProgress | null = null;
+
+    for (const p of possiblePaths) {
+      try {
+        const content = await fs.readFile(p, 'utf-8');
+        statusData = JSON.parse(content);
+        break;
+      } catch {
+        continue;
+      }
+    }
+
+    // Try progress.json
+    const progressPaths = [
+      path.join(process.cwd(), '..', '..', 'progress.json'),
+      path.join(process.cwd(), 'progress.json'),
+      '/Users/a2g/Projects/Optimai/progress.json',
+    ];
+
+    for (const p of progressPaths) {
+      try {
+        const content = await fs.readFile(p, 'utf-8');
+        progressData = JSON.parse(content);
+        break;
+      } catch {
+        continue;
+      }
+    }
+
+    return { status: statusData, progress: progressData };
+  } catch {
+    return { status: null, progress: null };
+  }
+}
+
+// Get stats from Supabase
+async function getSupabaseStats() {
+  try {
     const [tasksResult, remindersResult, ideasResult] = await Promise.all([
       supabase.from('dev_tasks').select('status'),
       supabase.from('reminders').select('status'),
@@ -86,63 +160,118 @@ export async function GET() {
     const reminders = remindersResult.data || [];
     const ideas = ideasResult.data || [];
 
-    const tasksPending = tasks.filter(t => t.status === 'pending' || t.status === 'in_progress').length;
-    const tasksCompleted = tasks.filter(t => t.status === 'completed' || t.status === 'done').length;
-    const remindersPending = reminders.filter(r => r.status === 'pending' || r.status === 'active').length;
+    return {
+      tasksPending: tasks.filter(t => t.status === 'pending' || t.status === 'in_progress').length,
+      tasksCompleted: tasks.filter(t => t.status === 'completed' || t.status === 'done').length,
+      remindersPending: reminders.filter(r => r.status === 'pending' || r.status === 'active').length,
+      ideasCount: ideas.length,
+    };
+  } catch {
+    return null;
+  }
+}
 
-    // Simulate status.json data (in production, this could be read from a KV store or database)
+function formatTime(date: Date): string {
+  return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+}
+
+export async function GET() {
+  try {
+    // 1. Try to read local status files first
+    const { status: localStatus, progress: localProgress } = await readLocalStatus();
+
+    // 2. Get stats from Supabase (shared data)
+    const supabaseStats = await getSupabaseStats();
+
+    // 3. Determine source and build response
+    let source: RalphStatus['source'] = 'fallback';
+    let state: RalphStatus['state'] = 'idle';
+    let currentTask = 'Sin conexión';
+    let speechBubble = 'Esperando conexión...';
+    let loopCount = 0;
+    let callsThisHour = 0;
+    let maxCalls = 50;
+    let nextReset = '';
+
+    if (localStatus) {
+      // Local status available - this is the primary source
+      source = 'local';
+      state = mapStatusToState(localStatus.status, localStatus.last_action);
+      currentTask = localProgress?.status || localStatus.last_action || 'Procesando';
+      speechBubble = getSpeechBubble(state, localStatus.last_action, localStatus.status);
+      loopCount = localStatus.loop_count;
+      callsThisHour = localStatus.calls_made_this_hour;
+      maxCalls = localStatus.max_calls_per_hour;
+      nextReset = localStatus.next_reset;
+    } else if (supabaseStats) {
+      // No local status but Supabase is available
+      source = 'supabase';
+      state = supabaseStats.tasksPending > 0 ? 'thinking' : 'idle';
+      currentTask = supabaseStats.tasksPending > 0 ? 'Tareas pendientes en cola' : 'Sin tareas activas';
+      speechBubble = 'Conectado a la nube';
+
+      // Simulate energy based on time
+      const now = new Date();
+      callsThisHour = Math.floor(Math.random() * 10) + 5;
+      maxCalls = 50;
+      const nextResetDate = new Date(now);
+      nextResetDate.setHours(nextResetDate.getHours() + 1, 0, 0, 0);
+      nextReset = nextResetDate.toISOString();
+    }
+
+    const energyCurrent = maxCalls - callsThisHour;
+
+    // Build activity log
     const now = new Date();
-    const hour = now.getHours();
-    const isActiveHour = hour >= 9 && hour < 20;
+    const recentActivity: RalphStatus['recentActivity'] = [];
 
-    // Simulate energy based on time
-    const maxCalls = 50;
-    const callsUsed = Math.floor(Math.random() * 10) + 5; // Simulated
-    const energyCurrent = maxCalls - callsUsed;
-
-    // Calculate next reset (next hour)
-    const nextReset = new Date(now);
-    nextReset.setHours(nextReset.getHours() + 1, 0, 0, 0);
-
-    // Determine Ralph's state based on activity
-    const isActive = isActiveHour && tasksPending > 0;
-    const state: RalphStatus['state'] = isActive ?
-      (Math.random() > 0.5 ? 'building' : 'thinking') :
-      'idle';
+    if (source === 'local') {
+      recentActivity.push(
+        { time: formatTime(now), action: `Estado: ${state}`, type: 'system' },
+        { time: formatTime(new Date(now.getTime() - 30000)), action: `Loop #${loopCount}`, type: 'task' },
+        { time: formatTime(new Date(now.getTime() - 60000)), action: `Energía: ${energyCurrent}/${maxCalls}`, type: 'energy' }
+      );
+    } else if (source === 'supabase' && supabaseStats) {
+      recentActivity.push(
+        { time: formatTime(now), action: 'Conectado a Supabase', type: 'system' },
+        { time: formatTime(new Date(now.getTime() - 30000)), action: `${supabaseStats.tasksPending} tareas pendientes`, type: 'task' }
+      );
+    } else {
+      recentActivity.push(
+        { time: formatTime(now), action: 'Sin conexión local', type: 'system' },
+        { time: formatTime(new Date(now.getTime() - 30000)), action: 'Usando datos de fallback', type: 'system' }
+      );
+    }
 
     const response: RalphStatus = {
       state,
-      currentTask: tasksPending > 0 ? 'Procesando backlog' : 'Sin tareas pendientes',
-      speechBubble: isActive ?
-        (state === 'building' ? 'Trabajando en ello...' : 'Analizando próximos pasos') :
-        'Todo tranquilo por aquí',
+      currentTask,
+      speechBubble,
       energy: {
         current: energyCurrent,
         max: maxCalls,
-        nextReset: nextReset.toISOString(),
+        nextReset: nextReset || new Date(Date.now() + 3600000).toISOString(),
       },
       stats: {
-        tasksCompleted,
-        tasksPending,
-        ideasCount: ideas.length,
-        remindersCount: remindersPending,
-        loopCount: Math.floor(Math.random() * 10) + 1, // Simulated
-        callsThisHour: callsUsed,
+        tasksCompleted: supabaseStats?.tasksCompleted || 0,
+        tasksPending: supabaseStats?.tasksPending || 0,
+        ideasCount: supabaseStats?.ideasCount || 0,
+        remindersCount: supabaseStats?.remindersPending || 0,
+        loopCount,
+        callsThisHour,
       },
-      recentActivity: [
-        { time: formatTime(new Date()), action: 'Sistema activo', type: 'system' },
-        { time: formatTime(new Date(Date.now() - 60000)), action: `${tasksPending} tareas pendientes`, type: 'task' },
-        { time: formatTime(new Date(Date.now() - 120000)), action: `Energía: ${energyCurrent}/${maxCalls}`, type: 'energy' },
-      ],
+      recentActivity,
+      source,
+      pueblo: 'Aitzol', // Default pueblo - will be dynamic later
     };
 
     return NextResponse.json(response);
   } catch (error) {
     console.error('Error fetching Ralph status:', error);
 
-    // Return default state on error
+    // Return disconnected state on error
     return NextResponse.json({
-      state: 'idle',
+      state: 'disconnected',
       currentTask: 'Error de conexión',
       speechBubble: 'Reconectando...',
       energy: { current: 0, max: 50, nextReset: '' },
@@ -154,11 +283,11 @@ export async function GET() {
         loopCount: 0,
         callsThisHour: 0,
       },
-      recentActivity: [],
+      recentActivity: [
+        { time: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }), action: 'Error de conexión', type: 'system' }
+      ],
+      source: 'fallback',
+      pueblo: 'Aitzol',
     } as RalphStatus);
   }
-}
-
-function formatTime(date: Date): string {
-  return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
 }

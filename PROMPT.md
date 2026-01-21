@@ -41,6 +41,14 @@ En Supabase crear schema para:
 - World muestra los 3 pueblos en el mapa
 - "Caravanas" visuales cuando hay tareas compartidas
 
+## PRIORIDAD 6: Mejorar Ralph Monitor
+El monitor actual (~/.ralph/ralph_monitor.sh) solo muestra loops y calls.
+Mejorarlo para mostrar:
+- Tarea actual que está ejecutando (leer de @fix_plan.md cuál está en progreso)
+- Última acción de Claude (parsear último log)
+- Checklist de progreso en tiempo real (tareas completadas vs pendientes)
+- Barra de progreso visual del @fix_plan.md
+
 ## Reglas
 - Código completo y funcional
 - Commits frecuentes con mensajes descriptivos
