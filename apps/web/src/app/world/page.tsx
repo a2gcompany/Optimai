@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, Task } from '@/lib/api';
-import { Zap, Coins, Activity, Maximize2, X } from 'lucide-react';
+import { Zap, Coins, Activity, Maximize2, X, RefreshCw } from 'lucide-react';
 
 // ============================================================================
 // TYPES
@@ -63,13 +63,29 @@ interface Particle {
 interface EnergySystem {
   current: number;
   max: number;
-  rechargeTime: number; // seconds until next recharge
+  nextReset: string;
 }
 
 interface LogEntry {
   time: string;
   action: string;
   type: 'task' | 'energy' | 'coin' | 'system';
+}
+
+interface RalphAPIResponse {
+  state: 'idle' | 'walking' | 'building' | 'thinking';
+  currentTask: string;
+  speechBubble: string;
+  energy: EnergySystem;
+  stats: {
+    tasksCompleted: number;
+    tasksPending: number;
+    ideasCount: number;
+    remindersCount: number;
+    loopCount: number;
+    callsThisHour: number;
+  };
+  recentActivity: LogEntry[];
 }
 
 // ============================================================================
@@ -99,21 +115,24 @@ function drawGround(
   ctx: CanvasRenderingContext2D,
   offsetX: number,
   offsetY: number,
-  scale: number
+  scale: number,
+  frame: number
 ) {
   const gridSize = 40;
   const gridCount = 15;
 
-  // Draw grass tiles
+  // Draw grass tiles with subtle animation
   for (let i = -gridCount; i <= gridCount; i++) {
     for (let j = -gridCount; j <= gridCount; j++) {
       const iso = toIso(i * gridSize, j * gridSize);
       const x = iso.x * scale + offsetX;
       const y = iso.y * scale + offsetY;
 
-      // Checkerboard grass pattern
+      // Checkerboard grass pattern with subtle wave
+      const wave = Math.sin((i + j) * 0.3 + frame * 0.02) * 0.02;
       const isLight = (i + j) % 2 === 0;
-      ctx.fillStyle = isLight ? '#1a2e1a' : '#162816';
+      const baseColor = isLight ? '#1a2e1a' : '#162816';
+      ctx.fillStyle = adjustBrightness(baseColor, wave * 50);
 
       ctx.beginPath();
       ctx.moveTo(x, y);
@@ -130,7 +149,6 @@ function drawGround(
   ctx.lineWidth = 8 * scale;
   ctx.setLineDash([10, 5]);
 
-  // Path connecting buildings
   const pathPoints = [
     toIso(-100, 75),
     toIso(0, 0),
@@ -173,7 +191,8 @@ function drawBuilding(
   const bh = roofHeight * scale;
 
   // Hover animation
-  const hoverOffset = isHovered ? Math.sin(frame * 0.1) * 2 : 0;
+  const hoverOffset = isHovered ? Math.sin(frame * 0.1) * 3 : 0;
+  const hoverScale = isHovered ? 1.02 : 1;
 
   // Shadow
   ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
@@ -187,46 +206,60 @@ function drawBuilding(
   // Left wall
   ctx.fillStyle = darkColor;
   ctx.beginPath();
-  ctx.moveTo(screenX - w, screenY + h - hoverOffset);
+  ctx.moveTo(screenX - w * hoverScale, screenY + h - hoverOffset);
   ctx.lineTo(screenX, screenY + h * 2 - hoverOffset);
   ctx.lineTo(screenX, screenY + h * 2 + bh - hoverOffset);
-  ctx.lineTo(screenX - w, screenY + h + bh - hoverOffset);
+  ctx.lineTo(screenX - w * hoverScale, screenY + h + bh - hoverOffset);
   ctx.closePath();
   ctx.fill();
 
   // Right wall
   ctx.fillStyle = color;
   ctx.beginPath();
-  ctx.moveTo(screenX + w, screenY + h - hoverOffset);
+  ctx.moveTo(screenX + w * hoverScale, screenY + h - hoverOffset);
   ctx.lineTo(screenX, screenY + h * 2 - hoverOffset);
   ctx.lineTo(screenX, screenY + h * 2 + bh - hoverOffset);
-  ctx.lineTo(screenX + w, screenY + h + bh - hoverOffset);
+  ctx.lineTo(screenX + w * hoverScale, screenY + h + bh - hoverOffset);
   ctx.closePath();
   ctx.fill();
 
   // Roof based on building type
   if (type === 'tower') {
-    // Pointed roof for tower
-    ctx.fillStyle = accentColor;
+    // Pointed roof for tower with glow effect
+    const gradient = ctx.createLinearGradient(screenX, screenY - 30 * scale, screenX, screenY + h * 2);
+    gradient.addColorStop(0, accentColor);
+    gradient.addColorStop(1, color);
+    ctx.fillStyle = gradient;
     ctx.beginPath();
     ctx.moveTo(screenX, screenY - 30 * scale - hoverOffset);
-    ctx.lineTo(screenX + w, screenY + h - hoverOffset);
+    ctx.lineTo(screenX + w * hoverScale, screenY + h - hoverOffset);
     ctx.lineTo(screenX, screenY + h * 2 - hoverOffset);
-    ctx.lineTo(screenX - w, screenY + h - hoverOffset);
+    ctx.lineTo(screenX - w * hoverScale, screenY + h - hoverOffset);
     ctx.closePath();
     ctx.fill();
+
+    // Tower beacon
+    if (frame % 60 < 30) {
+      ctx.fillStyle = accentColor;
+      ctx.shadowColor = accentColor;
+      ctx.shadowBlur = 15;
+      ctx.beginPath();
+      ctx.arc(screenX, screenY - 35 * scale - hoverOffset, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
   } else if (type === 'hq') {
     // Flat roof with antenna
     ctx.fillStyle = lightColor;
     ctx.beginPath();
     ctx.moveTo(screenX, screenY - hoverOffset);
-    ctx.lineTo(screenX + w, screenY + h - hoverOffset);
+    ctx.lineTo(screenX + w * hoverScale, screenY + h - hoverOffset);
     ctx.lineTo(screenX, screenY + h * 2 - hoverOffset);
-    ctx.lineTo(screenX - w, screenY + h - hoverOffset);
+    ctx.lineTo(screenX - w * hoverScale, screenY + h - hoverOffset);
     ctx.closePath();
     ctx.fill();
 
-    // Antenna
+    // Antenna with pulse
     ctx.strokeStyle = '#64748b';
     ctx.lineWidth = 3;
     ctx.beginPath();
@@ -234,38 +267,40 @@ function drawBuilding(
     ctx.lineTo(screenX, screenY - 25 * scale - hoverOffset);
     ctx.stroke();
 
-    // Blinking light
+    // Blinking light with glow
     if (Math.floor(frame / 30) % 2 === 0) {
       ctx.fillStyle = '#ef4444';
+      ctx.shadowColor = '#ef4444';
+      ctx.shadowBlur = 10;
       ctx.beginPath();
       ctx.arc(screenX, screenY - 25 * scale - hoverOffset, 4, 0, Math.PI * 2);
       ctx.fill();
+      ctx.shadowBlur = 0;
     }
   } else {
     // Standard roof
     ctx.fillStyle = lightColor;
     ctx.beginPath();
     ctx.moveTo(screenX, screenY - hoverOffset);
-    ctx.lineTo(screenX + w, screenY + h - hoverOffset);
+    ctx.lineTo(screenX + w * hoverScale, screenY + h - hoverOffset);
     ctx.lineTo(screenX, screenY + h * 2 - hoverOffset);
-    ctx.lineTo(screenX - w, screenY + h - hoverOffset);
+    ctx.lineTo(screenX - w * hoverScale, screenY + h - hoverOffset);
     ctx.closePath();
     ctx.fill();
   }
 
-  // Windows
-  const windowColor = 'rgba(255, 255, 200, 0.7)';
+  // Windows with animation
+  const windowAlpha = 0.6 + Math.sin(frame * 0.05) * 0.15;
+  const windowColor = `rgba(255, 255, 200, ${windowAlpha})`;
   const windowSize = 10 * scale;
 
   for (let row = 0; row < 2; row++) {
     for (let col = 0; col < 2; col++) {
-      // Right side windows
       const rwx = screenX + w * 0.25 + col * 15 * scale;
       const rwy = screenY + h + 12 * scale + row * 18 * scale - hoverOffset;
       ctx.fillStyle = windowColor;
       ctx.fillRect(rwx, rwy, windowSize * 0.8, windowSize);
 
-      // Left side windows
       const lwx = screenX - w * 0.75 + col * 15 * scale;
       ctx.fillRect(lwx, rwy, windowSize * 0.8, windowSize);
     }
@@ -285,18 +320,20 @@ function drawBuilding(
   ctx.fillStyle = isHovered ? '#fff' : 'rgba(255,255,255,0.7)';
   ctx.fillText(name, screenX, screenY + h * 2 + bh + 25 * scale);
 
-  // Stats badge
+  // Stats badge with pulse
   if (stats && stats.count > 0) {
     const badgeX = screenX + w * 0.6;
     const badgeY = screenY - 10 * scale - hoverOffset;
+    const pulseScale = 1 + Math.sin(frame * 0.1) * 0.1;
 
-    // Badge background
     ctx.fillStyle = '#ef4444';
+    ctx.shadowColor = '#ef4444';
+    ctx.shadowBlur = 8;
     ctx.beginPath();
-    ctx.arc(badgeX, badgeY, 14 * scale, 0, Math.PI * 2);
+    ctx.arc(badgeX, badgeY, 14 * scale * pulseScale, 0, Math.PI * 2);
     ctx.fill();
+    ctx.shadowBlur = 0;
 
-    // Badge text
     ctx.fillStyle = '#fff';
     ctx.font = `bold ${11 * scale}px Arial`;
     ctx.fillText(String(stats.count), badgeX, badgeY + 4 * scale);
@@ -305,16 +342,16 @@ function drawBuilding(
   // Hover glow
   if (isHovered) {
     ctx.shadowColor = accentColor;
-    ctx.shadowBlur = 25;
+    ctx.shadowBlur = 30;
     ctx.strokeStyle = accentColor;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(screenX, screenY - hoverOffset);
-    ctx.lineTo(screenX + w, screenY + h - hoverOffset);
-    ctx.lineTo(screenX + w, screenY + h + bh - hoverOffset);
+    ctx.lineTo(screenX + w * hoverScale, screenY + h - hoverOffset);
+    ctx.lineTo(screenX + w * hoverScale, screenY + h + bh - hoverOffset);
     ctx.lineTo(screenX, screenY + h * 2 + bh - hoverOffset);
-    ctx.lineTo(screenX - w, screenY + h + bh - hoverOffset);
-    ctx.lineTo(screenX - w, screenY + h - hoverOffset);
+    ctx.lineTo(screenX - w * hoverScale, screenY + h + bh - hoverOffset);
+    ctx.lineTo(screenX - w * hoverScale, screenY + h - hoverOffset);
     ctx.closePath();
     ctx.stroke();
     ctx.shadowBlur = 0;
@@ -342,9 +379,22 @@ function drawRalph(
   ctx.ellipse(screenX, screenY + 15 * scale, 10 * scale, 5 * scale, 0, 0, Math.PI * 2);
   ctx.fill();
 
+  // Body glow based on state
+  const glowColors: Record<string, string> = {
+    idle: '#06b6d4',
+    walking: '#3b82f6',
+    building: '#22c55e',
+    thinking: '#f59e0b',
+  };
+  const glowColor = glowColors[ralph.state];
+
+  ctx.shadowColor = glowColor;
+  ctx.shadowBlur = 10;
+
   // Body
-  ctx.fillStyle = '#06b6d4'; // Cyan for Ralph
+  ctx.fillStyle = '#06b6d4';
   ctx.fillRect(screenX - size / 2, screenY - size + bob, size, size * 1.4);
+  ctx.shadowBlur = 0;
 
   // Head
   ctx.fillStyle = '#fcd5ce';
@@ -364,17 +414,29 @@ function drawRalph(
   ctx.lineTo(screenX, screenY - size * 2.3 + bob);
   ctx.stroke();
 
-  // Antenna light
-  ctx.fillStyle = ralph.state === 'building' ? '#22c55e' : (ralph.state === 'thinking' ? '#f59e0b' : '#3b82f6');
+  // Antenna light with glow
+  const lightColor = ralph.state === 'building' ? '#22c55e' : (ralph.state === 'thinking' ? '#f59e0b' : '#3b82f6');
+  ctx.fillStyle = lightColor;
+  ctx.shadowColor = lightColor;
+  ctx.shadowBlur = 8;
   ctx.beginPath();
-  ctx.arc(screenX, screenY - size * 2.3 + bob, 3, 0, Math.PI * 2);
+  ctx.arc(screenX, screenY - size * 2.3 + bob, 4, 0, Math.PI * 2);
   ctx.fill();
+  ctx.shadowBlur = 0;
 
-  // Eyes
+  // Eyes - animated based on state
   ctx.fillStyle = '#1e293b';
   const eyeOffset = ralph.state === 'building' ? Math.sin(frame * 0.3) * 2 : 0;
-  ctx.fillRect(screenX - 4 * scale + eyeOffset, screenY - size * 1.5 + bob, 3 * scale, 3 * scale);
-  ctx.fillRect(screenX + 2 * scale + eyeOffset, screenY - size * 1.5 + bob, 3 * scale, 3 * scale);
+  const blinkPhase = frame % 180;
+
+  if (blinkPhase < 5) {
+    // Blinking
+    ctx.fillRect(screenX - 5 * scale, screenY - size * 1.5 + bob, 10 * scale, 1 * scale);
+  } else {
+    // Normal eyes
+    ctx.fillRect(screenX - 4 * scale + eyeOffset, screenY - size * 1.5 + bob, 3 * scale, 3 * scale);
+    ctx.fillRect(screenX + 2 * scale + eyeOffset, screenY - size * 1.5 + bob, 3 * scale, 3 * scale);
+  }
 
   // Tool when building
   if (ralph.state === 'building') {
@@ -387,6 +449,29 @@ function drawRalph(
     ctx.fillStyle = '#64748b';
     ctx.fillRect(-3 * scale, -5 * scale, 10 * scale, 8 * scale);
     ctx.restore();
+
+    // Sparks
+    if (frame % 10 < 3) {
+      ctx.fillStyle = '#fbbf24';
+      for (let i = 0; i < 3; i++) {
+        const sx = screenX + size + Math.random() * 10;
+        const sy = screenY - size * 0.3 + bob + Math.random() * 10;
+        ctx.fillRect(sx, sy, 2, 2);
+      }
+    }
+  }
+
+  // Thinking bubbles
+  if (ralph.state === 'thinking') {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+    const bubblePhase = (frame * 0.05) % (Math.PI * 2);
+    for (let i = 0; i < 3; i++) {
+      const bx = screenX + 15 + i * 8;
+      const by = screenY - size * 2 - i * 10 + Math.sin(bubblePhase + i) * 3 + bob;
+      ctx.beginPath();
+      ctx.arc(bx, by, 3 + i, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   // Speech bubble
@@ -395,8 +480,11 @@ function drawRalph(
     const bubbleX = screenX - bubbleWidth / 2;
     const bubbleY = screenY - size * 3.5 + bob;
 
+    // Fade effect
+    const alpha = Math.min(1, ralph.speechTimer / 60);
+
     // Bubble background
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    ctx.fillStyle = `rgba(255, 255, 255, ${0.95 * alpha})`;
     ctx.beginPath();
     ctx.roundRect(bubbleX, bubbleY, bubbleWidth, 24, 8);
     ctx.fill();
@@ -409,7 +497,7 @@ function drawRalph(
     ctx.fill();
 
     // Bubble text
-    ctx.fillStyle = '#1e293b';
+    ctx.fillStyle = `rgba(30, 41, 59, ${alpha})`;
     ctx.font = '11px "SF Mono", monospace';
     ctx.textAlign = 'center';
     ctx.fillText(ralph.speechBubble.substring(0, 25), screenX, bubbleY + 16);
@@ -438,17 +526,20 @@ function drawTaskAgent(
   ctx.fill();
 
   if (agent.state === 'celebrating') {
-    // Celebration animation - jumping
     const jumpHeight = Math.abs(Math.sin(frame * 0.2)) * 15;
 
     ctx.fillStyle = agent.color;
+    ctx.shadowColor = agent.color;
+    ctx.shadowBlur = 8;
     ctx.fillRect(screenX - size / 2, screenY - size - jumpHeight, size, size * 1.2);
+    ctx.shadowBlur = 0;
 
     ctx.fillStyle = '#fcd5ce';
     ctx.fillRect(screenX - size / 3, screenY - size * 1.4 - jumpHeight, size * 0.66, size * 0.5);
 
-    // Happy eyes (^_^)
-    ctx.fillStyle = '#1e293b';
+    // Happy eyes
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(screenX - 2 * scale, screenY - size * 1.2 - jumpHeight, 2 * scale, 0, Math.PI, true);
     ctx.stroke();
@@ -456,16 +547,15 @@ function drawTaskAgent(
     ctx.arc(screenX + 2 * scale, screenY - size * 1.2 - jumpHeight, 2 * scale, 0, Math.PI, true);
     ctx.stroke();
 
-    // Stars around
+    // Confetti
     ctx.fillStyle = '#fbbf24';
-    for (let i = 0; i < 3; i++) {
-      const starX = screenX + Math.cos(frame * 0.1 + i * 2) * 20;
-      const starY = screenY - size - jumpHeight + Math.sin(frame * 0.1 + i * 2) * 10;
-      ctx.font = '12px Arial';
-      ctx.fillText('★', starX, starY);
+    for (let i = 0; i < 5; i++) {
+      const starX = screenX + Math.cos(frame * 0.1 + i * 1.2) * 25;
+      const starY = screenY - size - jumpHeight + Math.sin(frame * 0.1 + i * 1.2) * 15 - 10;
+      ctx.font = '10px Arial';
+      ctx.fillText(['★', '✦', '•'][i % 3], starX, starY);
     }
   } else {
-    // Normal state
     ctx.fillStyle = agent.color;
     ctx.fillRect(screenX - size / 2, screenY - size + bob, size, size * 1.2);
 
@@ -521,9 +611,11 @@ export default function WorldPage() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [stats, setStats] = useState({ tasks: 0, ideas: 0, reminders: 0, transactions: 0 });
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [energy, setEnergy] = useState<EnergySystem>({ current: 45, max: 50, rechargeTime: 3600 });
+  const [energy, setEnergy] = useState<EnergySystem>({ current: 45, max: 50, nextReset: '' });
   const [coins, setCoins] = useState(0);
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [isConnected, setIsConnected] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
   const frameRef = useRef(0);
   const agentsRef = useRef<TaskAgent[]>([]);
@@ -579,14 +671,14 @@ export default function WorldPage() {
 
   // Add log entry
   const addLog = useCallback((action: string, type: LogEntry['type']) => {
-    const time = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    const time = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     setLogs(prev => [{ time, action, type }, ...prev.slice(0, 4)]);
   }, []);
 
   // Ralph actions
   const ralphSay = useCallback((message: string) => {
     ralphRef.current.speechBubble = message;
-    ralphRef.current.speechTimer = 180; // 3 seconds at 60fps
+    ralphRef.current.speechTimer = 180;
   }, []);
 
   const ralphMoveTo = useCallback((building: Building) => {
@@ -595,63 +687,105 @@ export default function WorldPage() {
     ralphRef.current.state = 'walking';
   }, []);
 
-  // Load stats
-  useEffect(() => {
-    async function loadStats() {
-      try {
-        const [taskStats, reminderStats, financeStats] = await Promise.all([
-          api.getTaskStats(),
-          api.getReminderStats(),
-          api.getFinanceSummary(),
-        ]);
+  // Fetch Ralph status from API
+  const fetchRalphStatus = useCallback(async () => {
+    try {
+      const response = await fetch('/api/ralph');
+      if (!response.ok) throw new Error('API error');
 
-        const ideas = await api.getIdeas(100);
-        const taskList = await api.getTasks(10);
+      const data: RalphAPIResponse = await response.json();
 
-        setStats({
-          tasks: taskStats.pending,
-          ideas: ideas.filter(i => i.status !== 'done').length,
-          reminders: reminderStats.pending,
-          transactions: financeStats.transactionCount,
-        });
-
-        setTasks(taskList.filter(t => t.status === 'in_progress' || t.status === 'pending').slice(0, 6));
-        setCoins(taskStats.completed);
-
-        // Update energy based on time (simulated)
-        setEnergy(prev => ({
-          ...prev,
-          current: Math.min(prev.max, prev.current + 1),
-          rechargeTime: Math.max(0, prev.rechargeTime - 2),
-        }));
-
-      } catch (e) {
-        console.error('Error loading stats:', e);
+      // Update Ralph state
+      ralphRef.current.state = data.state;
+      ralphRef.current.currentTask = data.currentTask;
+      if (data.speechBubble && data.speechBubble !== ralphRef.current.speechBubble) {
+        ralphSay(data.speechBubble);
       }
+
+      // Update energy
+      setEnergy(data.energy);
+
+      // Update stats
+      setStats({
+        tasks: data.stats.tasksPending,
+        ideas: data.stats.ideasCount,
+        reminders: data.stats.remindersCount,
+        transactions: 0, // Not tracked in Ralph API yet
+      });
+
+      // Update coins
+      setCoins(data.stats.tasksCompleted);
+
+      // Update logs from API
+      if (data.recentActivity.length > 0) {
+        setLogs(data.recentActivity);
+      }
+
+      setIsConnected(true);
+      setLastUpdate(new Date());
+    } catch (error) {
+      console.error('Error fetching Ralph status:', error);
+      setIsConnected(false);
     }
+  }, [ralphSay]);
 
-    loadStats();
+  // Load stats from API and set up polling
+  useEffect(() => {
+    // Initial fetch
+    fetchRalphStatus();
     addLog('Sistema iniciado', 'system');
-    ralphSay('Hola! Estoy listo para trabajar');
+    ralphSay('¡Hola! Conectando...');
 
-    const interval = setInterval(() => {
-      loadStats();
-      // Random Ralph behavior
-      if (Math.random() < 0.1) {
+    // Poll every 2 seconds
+    const pollInterval = setInterval(() => {
+      fetchRalphStatus();
+    }, 2000);
+
+    // Random Ralph movement every 5 seconds
+    const moveInterval = setInterval(() => {
+      if (Math.random() < 0.3) {
         const randomBuilding = buildings[Math.floor(Math.random() * buildings.length)];
         ralphMoveTo(randomBuilding);
-        addLog(`Caminando a ${randomBuilding.name}`, 'task');
       }
     }, 5000);
 
+    return () => {
+      clearInterval(pollInterval);
+      clearInterval(moveInterval);
+    };
+  }, [fetchRalphStatus, addLog, ralphSay, ralphMoveTo, buildings]);
+
+  // Also fetch tasks for agents
+  useEffect(() => {
+    async function loadTasks() {
+      try {
+        const [taskStats, taskList] = await Promise.all([
+          api.getTaskStats(),
+          api.getTasks(10),
+        ]);
+
+        setTasks(taskList.filter(t => t.status === 'in_progress' || t.status === 'pending').slice(0, 6));
+
+        // Update stats with API data if Ralph API failed
+        if (!isConnected) {
+          setStats(prev => ({ ...prev, tasks: taskStats.pending }));
+          setCoins(taskStats.completed);
+        }
+      } catch (e) {
+        console.error('Error loading tasks:', e);
+      }
+    }
+
+    loadTasks();
+    const interval = setInterval(loadTasks, 10000);
     return () => clearInterval(interval);
-  }, [addLog, ralphSay, ralphMoveTo]);
+  }, [isConnected]);
 
   // Initialize task agents
   useEffect(() => {
     const colors = ['#22c55e', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4'];
     agentsRef.current = tasks.map((task, i) => {
-      const targetBuilding = buildings[1 + Math.floor(Math.random() * 4)]; // Skip HQ
+      const targetBuilding = buildings[1 + Math.floor(Math.random() * 4)];
       return {
         id: task.id,
         title: task.title,
@@ -666,7 +800,7 @@ export default function WorldPage() {
         celebrateTimer: 0,
       };
     });
-  }, [tasks]);
+  }, [tasks, buildings]);
 
   // Animation loop
   useEffect(() => {
@@ -705,17 +839,18 @@ export default function WorldPage() {
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Stars
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+      // Stars with twinkle
       for (let i = 0; i < 80; i++) {
         const sx = (i * 137.5 + frame * 0.01) % canvas.width;
         const sy = (i * 97.3) % canvas.height;
-        const twinkle = Math.sin(frame * 0.05 + i) > 0.5 ? 1.5 : 1;
+        const twinkle = Math.sin(frame * 0.05 + i) > 0.3 ? 1.5 : 1;
+        const alpha = 0.3 + Math.sin(frame * 0.02 + i * 0.5) * 0.2;
+        ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
         ctx.fillRect(sx, sy, twinkle, twinkle);
       }
 
       // Ground
-      drawGround(ctx, offsetX, offsetY, scale);
+      drawGround(ctx, offsetX, offsetY, scale, frame);
 
       // Sort entities by depth
       const sortedBuildings = [...buildings].sort((a, b) => (a.x + a.y) - (b.x + b.y));
@@ -734,15 +869,11 @@ export default function WorldPage() {
       if (rdist > 2) {
         ralph.x += (rdx / rdist) * 0.8;
         ralph.y += (rdy / rdist) * 0.8;
-        ralph.state = 'walking';
+        if (ralph.state !== 'walking') ralph.state = 'walking';
       } else {
         if (ralph.state === 'walking') {
           ralph.state = Math.random() < 0.3 ? 'building' : 'idle';
-          if (ralph.state === 'building') {
-            ralphSay('Trabajando en algo...');
-          }
         }
-        // Occasionally change target
         if (frame % 300 === 0 && Math.random() < 0.3) {
           const randomBuilding = buildings[Math.floor(Math.random() * buildings.length)];
           ralph.targetX = randomBuilding.x + Math.random() * 40 - 20;
@@ -811,7 +942,7 @@ export default function WorldPage() {
       cancelAnimationFrame(animationId);
       window.removeEventListener('resize', resize);
     };
-  }, [hoveredBuilding, buildings, ralphSay]);
+  }, [hoveredBuilding, buildings]);
 
   // Mouse interaction
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -877,6 +1008,14 @@ export default function WorldPage() {
     setIsFullscreen(!isFullscreen);
   };
 
+  // Format time for display
+  const formatTimeAgo = (date: Date) => {
+    const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
+    if (seconds < 5) return 'ahora';
+    if (seconds < 60) return `hace ${seconds}s`;
+    return `hace ${Math.floor(seconds / 60)}m`;
+  };
+
   return (
     <div className={`flex ${isFullscreen ? 'fixed inset-0 z-50' : 'h-screen'} bg-slate-900`}>
       {/* Canvas container */}
@@ -893,6 +1032,14 @@ export default function WorldPage() {
         <div className="absolute top-4 left-1/2 -translate-x-1/2 text-center">
           <h1 className="text-2xl font-bold text-white tracking-wider">OPTIMAI WORLD</h1>
           <p className="text-xs text-slate-400 mt-1">Click en un edificio para navegar</p>
+        </div>
+
+        {/* Connection status */}
+        <div className={`absolute top-4 left-1/2 translate-x-20 flex items-center gap-2 px-2 py-1 rounded-full text-xs ${
+          isConnected ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+        }`}>
+          <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
+          {isConnected ? 'Conectado' : 'Sin conexión'}
         </div>
 
         {/* Back button */}
@@ -933,7 +1080,7 @@ export default function WorldPage() {
             </div>
             <div className="w-full bg-slate-700 rounded-full h-2.5">
               <div
-                className="bg-gradient-to-r from-yellow-500 to-amber-400 h-2.5 rounded-full transition-all"
+                className="bg-gradient-to-r from-yellow-500 to-amber-400 h-2.5 rounded-full transition-all duration-500"
                 style={{ width: `${(energy.current / energy.max) * 100}%` }}
               />
             </div>
@@ -947,7 +1094,7 @@ export default function WorldPage() {
               <span className="text-white font-semibold text-sm">Monedas</span>
               <span className="ml-auto text-amber-400 font-mono text-lg">{coins}</span>
             </div>
-            <p className="text-xs text-slate-400 mt-1">Tareas completadas hoy</p>
+            <p className="text-xs text-slate-400 mt-1">Tareas completadas</p>
           </div>
 
           {/* Stats */}
@@ -970,8 +1117,8 @@ export default function WorldPage() {
                 <span className="text-violet-400 font-mono">{stats.reminders}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Transacciones</span>
-                <span className="text-amber-400 font-mono">{stats.transactions}</span>
+                <span className="text-slate-400">Agentes activos</span>
+                <span className="text-cyan-400 font-mono">{agentsRef.current.length}</span>
               </div>
             </div>
           </div>
@@ -979,27 +1126,49 @@ export default function WorldPage() {
           {/* Ralph Activity Log */}
           <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700 flex-1">
             <div className="flex items-center gap-2 mb-3">
-              <div className="w-5 h-5 rounded-full bg-cyan-500 flex items-center justify-center text-xs">R</div>
+              <div className="w-5 h-5 rounded-full bg-cyan-500 flex items-center justify-center text-xs font-bold">R</div>
               <span className="text-white font-semibold text-sm">Ralph Monitor</span>
+              <RefreshCw className={`w-3 h-3 ml-auto text-slate-500 ${isConnected ? 'animate-spin' : ''}`} style={{ animationDuration: '2s' }} />
             </div>
+
+            {/* Ralph current state */}
+            <div className="mb-3 p-2 bg-slate-800/50 rounded border border-slate-600">
+              <div className="flex items-center gap-2 text-xs">
+                <div className={`w-2 h-2 rounded-full ${
+                  ralphRef.current.state === 'building' ? 'bg-green-400' :
+                  ralphRef.current.state === 'thinking' ? 'bg-yellow-400' :
+                  ralphRef.current.state === 'walking' ? 'bg-blue-400' :
+                  'bg-slate-400'
+                }`} />
+                <span className="text-slate-300 capitalize">{ralphRef.current.state}</span>
+              </div>
+              {ralphRef.current.currentTask && (
+                <p className="text-xs text-slate-400 mt-1 truncate">{ralphRef.current.currentTask}</p>
+              )}
+            </div>
+
             <div className="space-y-2">
               {logs.length === 0 ? (
                 <p className="text-slate-500 text-xs">Sin actividad reciente</p>
               ) : (
                 logs.map((log, i) => (
                   <div key={i} className="flex gap-2 text-xs">
-                    <span className="text-slate-500 font-mono">{log.time}</span>
+                    <span className="text-slate-500 font-mono shrink-0">{log.time}</span>
                     <span className={`${
                       log.type === 'coin' ? 'text-amber-400' :
                       log.type === 'energy' ? 'text-yellow-400' :
                       log.type === 'system' ? 'text-cyan-400' :
                       'text-slate-300'
-                    }`}>
+                    } truncate`}>
                       {log.action}
                     </span>
                   </div>
                 ))
               )}
+            </div>
+
+            <div className="mt-3 pt-2 border-t border-slate-700 text-xs text-slate-500">
+              Actualizado {formatTimeAgo(lastUpdate)}
             </div>
           </div>
 
