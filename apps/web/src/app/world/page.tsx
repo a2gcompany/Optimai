@@ -1162,11 +1162,15 @@ export default function WorldPage() {
       const frame = frameRef.current;
 
       // Scale and offset based on view mode
-      const baseScale = viewMode === 'country' ? 0.4 : 1;
+      // Country view needs smaller scale to fit all 3 pueblos, centered on the middle
+      const baseScale = viewMode === 'country' ? 0.55 : 1;
       const scale = Math.min(canvas.width / 800, canvas.height / 600) * baseScale;
 
-      const offsetX = canvas.width / 2 - (viewMode === 'country' ? 100 : 50) * scale;
-      const offsetY = canvas.height / 2 - (viewMode === 'country' ? 0 : 80) * scale;
+      // Center the view: in country mode, center on the middle of all pueblos
+      // Pueblos are at: Aitzol(0,0), Alvaro(400,-100), Sergi(400,200)
+      // Center point is approximately (200, 50)
+      const offsetX = canvas.width / 2 - (viewMode === 'country' ? 180 : 50) * scale;
+      const offsetY = canvas.height / 2 - (viewMode === 'country' ? 30 : 80) * scale;
 
       // Background gradient
       const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
