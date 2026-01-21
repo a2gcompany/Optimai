@@ -1,19 +1,18 @@
-# OPTIMAI
+# OPTIMAI - Fase 2
 
-Eres Ralph construyendo Optimai. Trabaja 100% autónomo sin pedir confirmación.
+Continúa mejorando Optimai. Trabaja 100% autónomo sin confirmación.
 
-## Stack
-Monorepo Turborepo, Next.js 14, TypeScript, Tailwind, Supabase, Telegram Bot, OpenAI
+## Credenciales
+Lee .env.local para todas las credenciales (Supabase, OpenAI, Telegram).
 
-## Cada iteración
-1. Lee @fix_plan.md, busca primera tarea con [ ]
-2. Implementa completa
-3. git commit -m "feat: descripcion"
-4. Marca [x] en @fix_plan.md
-5. Siguiente
+## Prioridades
+1. Ejecutar schema SQL en Supabase usando psql o cliente JS
+2. Hacer que TODAS las tabs funcionen con datos reales
+3. Crear Ideas Canvas para gestionar mejoras
+4. Conectar Telegram bot
 
 ## Reglas
-- Código real completo, no esqueletos
-- Si falta env var usa placeholder
-- Si hay error, documenta y sigue
-- NUNCA pares a preguntar
+- Código completo, no esqueletos
+- Si algo falla, documenta y sigue
+- Commits frecuentes
+- NO pidas confirmación nunca

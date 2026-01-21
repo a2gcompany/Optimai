@@ -1,25 +1,27 @@
-# Optimai Tareas
+# Optimai Fase 2
 
-## FASE 1
-- [x] Inicializar monorepo Turborepo
-- [x] Crear packages/types con tipos TypeScript
-- [x] Crear packages/db con Supabase client
-- [x] Crear packages/ai con OpenAI client
+## DATABASE
+- [ ] Ejecutar schema SQL en Supabase (packages/db/src/schema.sql)
+- [ ] Verificar que las tablas existen
 
-## FASE 2
-- [x] Crear apps/core Next.js
-- [x] Implementar lib/telegram.ts
-- [x] Implementar lib/brain.ts
-- [x] Implementar api/telegram/webhook/route.ts
-- [x] Implementar api/agent/cron/route.ts
+## WEB TABS
+- [ ] /tareas - CRUD real conectado a Supabase
+- [ ] /finanzas - mostrar transacciones reales, subir CSV
+- [ ] /recordatorios - CRUD conectado a Supabase
+- [ ] /configuracion - editar settings del usuario
 
-## FASE 3
-- [x] Crear apps/finance Next.js
-- [x] Implementar lib/parser.ts
-- [x] Implementar lib/categorizer.ts
-- [x] Implementar api/upload/route.ts
+## IDEAS CANVAS
+- [ ] Crear tabla ideas en schema.sql
+- [ ] Crear página /ideas con vista kanban
+- [ ] Estados: backlog, in_progress, done
+- [ ] Añadir al sidebar
 
-## FASE 4
-- [x] Crear apps/web Next.js
-- [x] Implementar dashboard page.tsx
-- [x] Crear turbo.json y README.md
+## TELEGRAM
+- [ ] Configurar webhook apuntando a apps/core
+- [ ] Comandos: /start, /status, /tareas, /ideas
+- [ ] Enviar notificaciones de recordatorios
+
+## DASHBOARD
+- [ ] Conectar stats reales desde Supabase
+- [ ] Mostrar tareas pendientes reales
+- [ ] Mostrar últimas transacciones reales
