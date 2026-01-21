@@ -610,9 +610,9 @@ function drawCaravan(
 
   if (!fromPueblo || !toPueblo) return;
 
-  // Calculate position along path
-  const fromPos = { x: fromPueblo.position.x + 100, y: fromPueblo.position.y + 50 };
-  const toPos = { x: toPueblo.position.x + 50, y: toPueblo.position.y + 50 };
+  // Calculate position along path - offset from pueblo centers
+  const fromPos = { x: fromPueblo.position.x + 80, y: fromPueblo.position.y + 40 };
+  const toPos = { x: toPueblo.position.x + 40, y: toPueblo.position.y + 40 };
 
   const currentX = fromPos.x + (toPos.x - fromPos.x) * caravan.progress;
   const currentY = fromPos.y + (toPos.y - fromPos.y) * caravan.progress;
@@ -623,54 +623,60 @@ function drawCaravan(
 
   const bob = Math.sin(frame * 0.1) * 2;
 
+  // Increase caravan size for better visibility (1.5x base size)
+  const cs = scale * 1.5; // caravan scale
+
   // Draw caravan (cart with goods)
   // Wheels
   ctx.fillStyle = '#854d0e';
   ctx.beginPath();
-  ctx.arc(screenX - 8 * scale, screenY + 5 * scale + bob, 4 * scale, 0, Math.PI * 2);
+  ctx.arc(screenX - 8 * cs, screenY + 5 * cs + bob, 4 * cs, 0, Math.PI * 2);
   ctx.fill();
   ctx.beginPath();
-  ctx.arc(screenX + 8 * scale, screenY + 5 * scale + bob, 4 * scale, 0, Math.PI * 2);
+  ctx.arc(screenX + 8 * cs, screenY + 5 * cs + bob, 4 * cs, 0, Math.PI * 2);
   ctx.fill();
 
   // Cart body
   ctx.fillStyle = caravan.color;
   ctx.shadowColor = caravan.color;
-  ctx.shadowBlur = 8;
-  ctx.fillRect(screenX - 12 * scale, screenY - 8 * scale + bob, 24 * scale, 12 * scale);
+  ctx.shadowBlur = 10;
+  ctx.fillRect(screenX - 12 * cs, screenY - 8 * cs + bob, 24 * cs, 12 * cs);
   ctx.shadowBlur = 0;
 
   // Cargo
   ctx.fillStyle = adjustBrightness(caravan.color, -30);
-  ctx.fillRect(screenX - 8 * scale, screenY - 16 * scale + bob, 16 * scale, 8 * scale);
+  ctx.fillRect(screenX - 8 * cs, screenY - 16 * cs + bob, 16 * cs, 8 * cs);
 
   // Flag
   ctx.fillStyle = '#fff';
   ctx.strokeStyle = '#64748b';
-  ctx.lineWidth = 1;
+  ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(screenX, screenY - 16 * scale + bob);
-  ctx.lineTo(screenX, screenY - 28 * scale + bob);
+  ctx.moveTo(screenX, screenY - 16 * cs + bob);
+  ctx.lineTo(screenX, screenY - 28 * cs + bob);
   ctx.stroke();
   ctx.beginPath();
-  ctx.moveTo(screenX, screenY - 28 * scale + bob);
-  ctx.lineTo(screenX + 10 * scale, screenY - 24 * scale + bob);
-  ctx.lineTo(screenX, screenY - 20 * scale + bob);
+  ctx.moveTo(screenX, screenY - 28 * cs + bob);
+  ctx.lineTo(screenX + 10 * cs, screenY - 24 * cs + bob);
+  ctx.lineTo(screenX, screenY - 20 * cs + bob);
   ctx.closePath();
   ctx.fill();
 
-  // Task label
-  ctx.font = `${8 * scale}px "SF Mono", monospace`;
+  // Task label with background for better readability
+  ctx.font = `bold ${10 * cs}px "SF Mono", monospace`;
+  const textWidth = ctx.measureText(caravan.taskTitle.substring(0, 15)).width;
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(screenX - textWidth / 2 - 4, screenY - 36 * cs + bob - 8, textWidth + 8, 14);
   ctx.fillStyle = '#fff';
   ctx.textAlign = 'center';
-  ctx.fillText(caravan.taskTitle.substring(0, 15), screenX, screenY - 32 * scale + bob);
+  ctx.fillText(caravan.taskTitle.substring(0, 15), screenX, screenY - 36 * cs + bob);
 
   // Progress indicator
-  const progressWidth = 30 * scale;
+  const progressWidth = 40 * cs;
   ctx.fillStyle = 'rgba(0,0,0,0.5)';
-  ctx.fillRect(screenX - progressWidth / 2, screenY + 15 * scale, progressWidth, 3 * scale);
+  ctx.fillRect(screenX - progressWidth / 2, screenY + 18 * cs, progressWidth, 4 * cs);
   ctx.fillStyle = caravan.color;
-  ctx.fillRect(screenX - progressWidth / 2, screenY + 15 * scale, progressWidth * caravan.progress, 3 * scale);
+  ctx.fillRect(screenX - progressWidth / 2, screenY + 18 * cs, progressWidth * caravan.progress, 4 * cs);
 }
 
 function drawRalph(
