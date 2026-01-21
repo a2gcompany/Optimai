@@ -320,6 +320,91 @@ export interface Database {
           completed_at?: string | null;
         };
       };
+      ideas: {
+        Row: {
+          id: string;
+          user_id: string;
+          title: string;
+          description: string | null;
+          category: string;
+          status: string;
+          priority: number;
+          effort: string | null;
+          impact: string | null;
+          tags: string[];
+          links: Json;
+          notes: string | null;
+          votes: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          title: string;
+          description?: string | null;
+          category?: string;
+          status?: string;
+          priority?: number;
+          effort?: string | null;
+          impact?: string | null;
+          tags?: string[];
+          links?: Json;
+          notes?: string | null;
+          votes?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          title?: string;
+          description?: string | null;
+          category?: string;
+          status?: string;
+          priority?: number;
+          effort?: string | null;
+          impact?: string | null;
+          tags?: string[];
+          links?: Json;
+          notes?: string | null;
+          votes?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      user_patterns: {
+        Row: {
+          id: string;
+          user_id: string;
+          pattern: string;
+          category_id: string | null;
+          confidence: number;
+          usage_count: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          pattern: string;
+          category_id?: string | null;
+          confidence?: number;
+          usage_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          pattern?: string;
+          category_id?: string | null;
+          confidence?: number;
+          usage_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
     };
     Views: {
       [_ in never]: never;

@@ -37,9 +37,9 @@ const mockTransactions: Transaction[] = [
 ];
 
 const mockReminders: Reminder[] = [
-  { id: '1', message: 'Llamar a Neil sobre contrato de Roger', scheduled_at: '2026-01-21T14:00:00Z' },
-  { id: '2', message: 'Revisar métricas de Tipit', scheduled_at: '2026-01-21T18:00:00Z' },
-  { id: '3', message: 'Enviar propuesta a BABEL Music', scheduled_at: '2026-01-22T10:00:00Z' },
+  { id: '1', title: 'Llamar a Neil sobre contrato de Roger', priority: 3, is_completed: false, list_name: 'A2G Talents' },
+  { id: '2', title: 'Revisar métricas de Tipit', priority: 2, is_completed: false, list_name: 'S-CORE' },
+  { id: '3', title: 'Enviar propuesta a BABEL Music', priority: 4, is_completed: false, list_name: 'BABEL' },
 ];
 
 export default function DashboardPage() {

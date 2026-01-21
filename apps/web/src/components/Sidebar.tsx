@@ -5,6 +5,7 @@ import {
   CheckSquare,
   Wallet,
   Bell,
+  Lightbulb,
   Settings,
   Bot
 } from 'lucide-react';
@@ -16,6 +17,7 @@ const navigation = [
   { name: 'Tareas', href: '/tasks', icon: CheckSquare },
   { name: 'Finanzas', href: '/finance', icon: Wallet },
   { name: 'Recordatorios', href: '/reminders', icon: Bell },
+  { name: 'Ideas', href: '/ideas', icon: Lightbulb },
   { name: 'Configuración', href: '/settings', icon: Settings },
 ];
 
