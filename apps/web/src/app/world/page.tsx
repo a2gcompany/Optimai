@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, Task } from '@/lib/api';
-import { Zap, Coins, Activity, Maximize2, X, RefreshCw, Users, Map } from 'lucide-react';
+import { Zap, Coins, Activity, Maximize2, X, RefreshCw, Users, Map, TrendingUp, Crown } from 'lucide-react';
 
 // ============================================================================
 // TYPES
@@ -1501,6 +1501,74 @@ export default function WorldPage() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Country Level (in country view) */}
+          {viewMode === 'country' && (
+            <div className="bg-gradient-to-br from-purple-900/50 to-indigo-900/50 rounded-lg p-3 border border-purple-500/30">
+              <div className="flex items-center gap-2 mb-3">
+                <Crown className="w-5 h-5 text-yellow-400" />
+                <span className="text-white font-semibold text-sm">Nivel del País</span>
+              </div>
+              {(() => {
+                const totalCoins = pueblos.reduce((sum, p) => sum + p.stats.coins, 0);
+                const totalTasks = pueblos.reduce((sum, p) => sum + p.stats.tasksCompleted, 0);
+                const totalStreak = pueblos.reduce((sum, p) => sum + p.stats.streak, 0);
+                const countryLevel = Math.floor(totalCoins / 100) + 1;
+                const xpToNext = 100 - (totalCoins % 100);
+                const progressPct = ((totalCoins % 100) / 100) * 100;
+
+                const levelTitles = [
+                  'Aldea', 'Villa', 'Pueblo', 'Ciudad', 'Metrópolis',
+                  'Capital', 'Imperio', 'Utopía', 'Legendario', 'Mítico'
+                ];
+                const levelTitle = levelTitles[Math.min(countryLevel - 1, levelTitles.length - 1)];
+
+                return (
+                  <>
+                    <div className="text-center mb-3">
+                      <div className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-500">
+                        Lv.{countryLevel}
+                      </div>
+                      <div className="text-purple-300 text-sm">{levelTitle}</div>
+                    </div>
+
+                    <div className="mb-3">
+                      <div className="flex justify-between text-xs text-slate-400 mb-1">
+                        <span>XP hasta Lv.{countryLevel + 1}</span>
+                        <span>{xpToNext} coins</span>
+                      </div>
+                      <div className="w-full bg-slate-700 rounded-full h-2">
+                        <div
+                          className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all duration-500"
+                          style={{ width: `${progressPct}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                      <div className="bg-slate-800/50 rounded p-2">
+                        <div className="text-yellow-400 font-bold">{totalCoins}</div>
+                        <div className="text-slate-500">Coins</div>
+                      </div>
+                      <div className="bg-slate-800/50 rounded p-2">
+                        <div className="text-green-400 font-bold">{totalTasks}</div>
+                        <div className="text-slate-500">Tareas</div>
+                      </div>
+                      <div className="bg-slate-800/50 rounded p-2">
+                        <div className="text-orange-400 font-bold">{totalStreak}</div>
+                        <div className="text-slate-500">Streak</div>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex items-center gap-1 text-xs text-emerald-400">
+                      <TrendingUp className="w-3 h-3" />
+                      <span>+{pueblos.filter(p => p.ralphState === 'building').length * 2} XP/min activo</span>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           )}
 

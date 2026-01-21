@@ -31,12 +31,12 @@
 - [x] Cada pueblo tiene su Ralph
 - [x] Stats de cada pueblo visibles
 - [x] Caravanas para tareas compartidas
-- [ ] País crece con actividad total
+- [x] País crece con actividad total
 
 ## ARQUITECTURA LOCAL
 - [x] apps/web corre en localhost:3000
 - [x] Lee archivos locales (status.json, logs)
-- [ ] Claude como backend de análisis
+- [x] Claude como backend de análisis
 - [x] Datos sensibles nunca salen del Mac
 
 ## MEJORAR RALPH MONITOR
@@ -45,3 +45,7 @@
 - [x] Checklist visual de @fix_plan.md (completadas/pendientes)
 - [x] Barra de progreso del plan
 - [x] Actualizar ~/.ralph/ralph_monitor.sh
+
+---
+## COMPLETADO: 100%
+Todas las tareas del plan han sido implementadas.
