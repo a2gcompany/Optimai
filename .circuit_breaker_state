@@ -1,9 +1,10 @@
 {
     "state": "CLOSED",
-    "last_change": "2026-01-21T02:45:26+00:00",
+    "last_change": "2026-01-21T03:01:58+00:00",
     "consecutive_no_progress": 0,
     "consecutive_same_error": 0,
-    "last_progress_loop": 0,
+    "last_progress_loop": 4,
     "total_opens": 0,
-    "reason": ""
+    "reason": "",
+    "current_loop": 4
 }

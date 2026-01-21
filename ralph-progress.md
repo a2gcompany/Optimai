@@ -178,3 +178,54 @@ Iniciado: Wed Jan 21 02:35:15 CST 2026
 **TODAS LAS FASES COMPLETADAS**
 
 ---
+
+## Iteración 9 - 2026-01-21 (FASE 2)
+
+### Completado:
+- [x] Verificar tablas existentes en Supabase (dev_tasks, reminders, nucleus_users, messages)
+- [x] Adaptar repositorios para usar tablas de Nucleus existentes
+- [x] Implementar fallback a localStorage/cache para tablas que no existen
+- [x] Actualizar api.ts con datos de demo relevantes para A2G
+- [x] Ideas Canvas completo con Kanban y vista de lista
+- [x] Script de prueba de Telegram bot
+
+### Detalles:
+- **packages/db/src/repositories/**:
+  - `users.ts`: Usa `nucleus_users` (mapeando telegram_id a phone)
+  - `tasks.ts`: Usa `dev_tasks` directamente
+  - `reminders.ts`: Usa `reminders` directamente
+  - `conversations.ts`: Cache en memoria + fallback a `messages`
+  - `transactions.ts`: Cache en memoria con datos de demo
+  - `categories.ts`: Cache en memoria con 14 categorías predefinidas
+
+- **apps/web/src/lib/api.ts**:
+  - Inicialización automática de datos de demo
+  - Integración con localStorage para transacciones e ideas
+  - Datos de demo contextualizados para A2G:
+    - Transacciones de artistas (Roger Sanchez, Prophecy)
+    - Gastos de empresas (PAIDDADS, A2G FZCO)
+    - Suscripciones de software (OpenAI, Vercel)
+
+- **Ideas Canvas** (`/ideas`):
+  - Vista Kanban con 5 columnas de estado
+  - Vista Lista con tabla ordenable
+  - Drag & drop entre columnas
+  - Votación de ideas
+  - Filtros por categoría, esfuerzo, impacto
+  - Tags personalizados
+
+- **Telegram Bot**:
+  - Credenciales verificadas en .env.local
+  - Script de prueba creado (scripts/test-telegram.mjs)
+  - Webhook endpoint listo en apps/core
+
+### Problema encontrado:
+Las tablas `optimai_*` no existen en Supabase y no se puede ejecutar DDL directamente con la API REST.
+**Solución**: usar tablas existentes de Nucleus + cache en memoria para datos que no tienen tablas.
+
+### Pendiente próxima iteración:
+- Configurar webhook de Telegram en producción
+- Probar el bot end-to-end
+- Deploy a Vercel
+
+---
