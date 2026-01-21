@@ -1,27 +1,33 @@
-# Optimai Fase 2
+# Optimai Fase 3
 
 ## DATABASE
-- [ ] Ejecutar schema SQL en Supabase (packages/db/src/schema.sql)
-- [ ] Verificar que las tablas existen
+- [ ] Ejecutar packages/db/schema.sql en Supabase
+- [ ] Crear datos de prueba iniciales
 
-## WEB TABS
-- [ ] /tareas - CRUD real conectado a Supabase
-- [ ] /finanzas - mostrar transacciones reales, subir CSV
-- [ ] /recordatorios - CRUD conectado a Supabase
-- [ ] /configuracion - editar settings del usuario
-
-## IDEAS CANVAS
-- [ ] Crear tabla ideas en schema.sql
-- [ ] Crear página /ideas con vista kanban
-- [ ] Estados: backlog, in_progress, done
-- [ ] Añadir al sidebar
+## WEB FUNCIONAL
+- [ ] /tareas - CRUD conectado a Supabase
+- [ ] /finanzas - mostrar y subir transacciones
+- [ ] /recordatorios - CRUD funcional
+- [ ] /ideas - kanban con drag & drop
+- [ ] /configuracion - guardar settings en Supabase
+- [ ] Dashboard - stats reales
 
 ## TELEGRAM
-- [ ] Configurar webhook apuntando a apps/core
-- [ ] Comandos: /start, /status, /tareas, /ideas
-- [ ] Enviar notificaciones de recordatorios
+- [ ] Script para configurar webhook automaticamente
+- [ ] Probar /start responde
+- [ ] Probar /status devuelve resumen
 
-## DASHBOARD
-- [ ] Conectar stats reales desde Supabase
-- [ ] Mostrar tareas pendientes reales
-- [ ] Mostrar últimas transacciones reales
+## DEPLOY
+- [ ] Crear vercel.json para monorepo
+- [ ] Deploy apps/web
+- [ ] Configurar dominio o usar .vercel.app
+
+## WORLD VIEW
+- [ ] Crear apps/world con Next.js
+- [ ] Implementar canvas 2D con edificios
+- [ ] Edificio "Core" - click abre /dashboard
+- [ ] Edificio "Finance" - click abre /finanzas
+- [ ] Edificio "Tasks" - click abre /tareas
+- [ ] Edificio "Ideas" - click abre /ideas
+- [ ] Personajes animados representando tareas
+- [ ] Integrar en sidebar como "World"

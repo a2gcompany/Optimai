@@ -1,18 +1,43 @@
-# OPTIMAI - Fase 2
+# OPTIMAI - Fase 3: Produccion y World View
 
-Continúa mejorando Optimai. Trabaja 100% autónomo sin confirmación.
+Trabaja 100% autonomo sin pedir confirmacion.
 
 ## Credenciales
-Lee .env.local para todas las credenciales (Supabase, OpenAI, Telegram).
+Lee .env.local para Supabase, OpenAI, Telegram, Vercel.
 
-## Prioridades
-1. Ejecutar schema SQL en Supabase usando psql o cliente JS
-2. Hacer que TODAS las tabs funcionen con datos reales
-3. Crear Ideas Canvas para gestionar mejoras
-4. Conectar Telegram bot
+## PRIORIDAD 1: Base de datos
+- Ejecutar schema SQL en Supabase (usa DATABASE_URL de .env.local)
+- Verificar que todas las tablas existen
+
+## PRIORIDAD 2: Conectar datos reales
+- Dashboard debe mostrar stats reales desde Supabase
+- /tareas debe hacer CRUD real
+- /finanzas debe mostrar transacciones reales
+- /recordatorios debe funcionar con datos reales
+- /ideas debe tener vista kanban funcional
+
+## PRIORIDAD 3: Telegram Bot
+- Configurar webhook: https://api.telegram.org/bot{TOKEN}/setWebhook?url={VERCEL_URL}/api/telegram/webhook
+- Implementar comandos: /start, /status, /tareas, /ideas
+- El bot debe responder mensajes
+
+## PRIORIDAD 4: Deploy Vercel
+- Configurar vercel.json para monorepo
+- Deploy apps/web a produccion
+- Deploy apps/core como serverless functions
+- Configurar env vars en Vercel
+
+## PRIORIDAD 5: OPTIMAI WORLD (Vista Visual)
+- Crear apps/world con vista 2D isometrica
+- Usar Pixi.js o canvas simple
+- Edificios = modulos (Core, Finance, Ideas, Tasks)
+- Personajes pequenos = tareas activas moviendose
+- Animacion cuando se completa una tarea
+- Click en edificio = navega al modulo
+- Estilo pixel art minimalista, colores oscuros como el dashboard
 
 ## Reglas
-- Código completo, no esqueletos
-- Si algo falla, documenta y sigue
-- Commits frecuentes
-- NO pidas confirmación nunca
+- Codigo completo, no esqueletos
+- Si falta algo, crealo
+- Commits frecuentes con mensajes descriptivos
+- NO pidas confirmacion nunca
