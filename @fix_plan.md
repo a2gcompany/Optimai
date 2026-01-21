@@ -1,33 +1,27 @@
-# Optimai Fase 3
+# Optimai - World View Priority
 
-## DATABASE
-- [ ] Ejecutar packages/db/schema.sql en Supabase
-- [ ] Crear datos de prueba iniciales
+## WORLD VIEW (HACER PRIMERO)
+- [ ] Crear apps/world con Next.js + canvas
+- [ ] Diseñar mapa 2D con 5 edificios
+- [ ] Implementar personaje Ralph animado
+- [ ] Ralph muestra estado: working/idle
+- [ ] Burbuja de texto con tarea actual
+- [ ] Sistema de energía (API calls restantes)
+- [ ] Sistema de monedas (tareas completadas)
+- [ ] Personajes para tareas activas
+- [ ] Click edificio = navegar a módulo
+- [ ] Panel lateral con stats en tiempo real
+- [ ] Leer status.json para estado de Ralph
+- [ ] Integrar en sidebar del dashboard
 
-## WEB FUNCIONAL
-- [ ] /tareas - CRUD conectado a Supabase
-- [ ] /finanzas - mostrar y subir transacciones
-- [ ] /recordatorios - CRUD funcional
-- [ ] /ideas - kanban con drag & drop
-- [ ] /configuracion - guardar settings en Supabase
-- [ ] Dashboard - stats reales
+## DATOS REALES (DESPUES)
+- [ ] Ejecutar schema SQL en Supabase
+- [ ] Conectar World a datos reales
+- [ ] /tareas CRUD funcional
+- [ ] /finanzas funcional
+- [ ] /ideas kanban funcional
 
-## TELEGRAM
-- [ ] Script para configurar webhook automaticamente
-- [ ] Probar /start responde
-- [ ] Probar /status devuelve resumen
-
-## DEPLOY
-- [ ] Crear vercel.json para monorepo
-- [ ] Deploy apps/web
-- [ ] Configurar dominio o usar .vercel.app
-
-## WORLD VIEW
-- [ ] Crear apps/world con Next.js
-- [ ] Implementar canvas 2D con edificios
-- [ ] Edificio "Core" - click abre /dashboard
-- [ ] Edificio "Finance" - click abre /finanzas
-- [ ] Edificio "Tasks" - click abre /tareas
-- [ ] Edificio "Ideas" - click abre /ideas
-- [ ] Personajes animados representando tareas
-- [ ] Integrar en sidebar como "World"
+## POLISH
+- [ ] Animaciones de celebracion
+- [ ] Sonidos opcionales
+- [ ] Responsive para movil
