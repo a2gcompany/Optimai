@@ -1,42 +1,35 @@
-# Optimai - Testing y Bugs
+# Optimai - Funcionalidad 100%
 
-**Ultima actualizacion:** 2026-01-21 16:45
+## WORLD 2D (HACER PRIMERO)
+- [ ] Eliminar vista isométrica/3D
+- [ ] Crear vista 2D top-down simple
+- [ ] Edificios como rectángulos con colores sólidos
+- [ ] Ralph como icono simple (círculo o emoji)
+- [ ] Click en edificio navega al módulo
+- [ ] Sin animaciones complejas
+- [ ] Responsive y limpio
 
-## BUGS CRITICOS (ARREGLADOS)
-- [x] World: "Conectando..." infinito sin Ralph - YA TENIA FALLBACK
-- [x] World: Click en edificios no navega - FIX: hitbox calculation
-- [x] World: Boton "Dashboard" no funciona - FIX: z-index
-- [x] World: Solo 1 pueblo visible - FIX: scale 0.55, offset (180,30)
-- [x] World: Caravanas no visibles - FIX: caravan scale 1.5x
-- [x] World: Estilos rotos/petados - VERIFICADO OK
+## NAVEGACIÓN
+- [ ] Click HQ → /
+- [ ] Click Taller → /tasks
+- [ ] Click Banco → /finance
+- [ ] Click Biblioteca → /ideas
+- [ ] Click Torre → /reminders
+- [ ] Click Config → /settings
+- [ ] Botón "← Dashboard" funciona
+- [ ] Sidebar links funcionan todos
 
-## TESTING PAGINAS
-- [x] /world - funciona completo
-- [x] /tasks - carga y funciona
-- [x] /finance - carga y funciona
-- [x] /ideas - carga y funciona (kanban + lista)
-- [x] /reminders - carga y funciona
-- [x] / (dashboard) - carga y funciona
-- [x] /settings - carga y funciona
-
-## NAVEGACION
-- [x] Sidebar links funcionan
-- [x] Volver atras funciona (boton Dashboard)
-- [x] Edificios navegan correctamente (modo pueblo)
+## PÁGINAS
+- [ ] / (dashboard) - carga stats
+- [ ] /tasks - CRUD completo
+- [ ] /finance - muestra transacciones
+- [ ] /ideas - kanban funcional
+- [ ] /reminders - CRUD completo
+- [ ] /settings - guarda config
+- [ ] /world - vista 2D limpia
 
 ## CALIDAD
-- [x] Sin errores en consola del navegador
-- [x] Build de produccion exitoso
-- [x] Responsive movil - pendiente verificacion visual
-- [x] Fallbacks elegantes sin datos
-- [x] Loading states correctos
-
-## DEPLOY
-- [x] Build sin errores
-- [ ] Vercel deploy exitoso - en progreso (auto-deploy)
-- [ ] Produccion funciona igual que local - pendiente verificar
-
-## COMMITS REALIZADOS
-1. `fix: improve World view scale to show all 3 pueblos`
-2. `fix: correct building hitbox detection and add z-index to navigation buttons`
-3. `fix: increase caravan size and improve visibility in World view`
+- [ ] Sin errores en consola
+- [ ] Todo clickeable responde
+- [ ] Loading states correctos
+- [ ] Fallbacks cuando no hay datos
