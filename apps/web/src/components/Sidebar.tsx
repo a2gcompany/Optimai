@@ -7,13 +7,15 @@ import {
   Bell,
   Lightbulb,
   Settings,
-  Bot
+  Bot,
+  Globe
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { name: 'World', href: '/world', icon: Globe },
   { name: 'Tareas', href: '/tasks', icon: CheckSquare },
   { name: 'Finanzas', href: '/finance', icon: Wallet },
   { name: 'Recordatorios', href: '/reminders', icon: Bell },
