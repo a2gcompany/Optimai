@@ -1,7 +1,7 @@
 // API client para comunicarse con Supabase directamente
 // Usa tablas existentes de Nucleus donde es posible
 // Para Ideas y Transactions que no existen aún, usa localStorage como fallback
-import { supabase, DbCategory } from './supabase';
+import { supabase, type DbCategory } from './supabase';
 
 // Storage helpers for browser fallback
 const STORAGE_KEYS = {
@@ -604,4 +604,4 @@ class APIClient {
 }
 
 export const api = new APIClient();
-export { DbCategory };
+export type { DbCategory } from './supabase';

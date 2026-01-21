@@ -5,6 +5,7 @@ export * from './tasks';
 export * from './transactions';
 export * from './reminders';
 export * from './categories';
+export * from './ideas';
 
 // Re-export repository classes for compatibility
 export { UsersRepository } from './users';
@@ -13,3 +14,4 @@ export { TasksRepository } from './tasks';
 export { TransactionsRepository } from './transactions';
 export { RemindersRepository } from './reminders';
 export { CategoriesRepository } from './categories';
+export { IdeasRepository } from './ideas';
