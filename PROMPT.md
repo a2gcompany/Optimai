@@ -1,57 +1,52 @@
-# OPTIMAI - Arquitectura Pueblos + Tools Locales
+# OPTIMAI - MODO TESTING Y CORRECCIÓN DE BUGS
 
-Trabaja 100% autónomo sin pedir confirmación.
+Trabaja 100% autónomo. El usuario está en reunión 2 horas.
+OBJETIVO: Testear TODO y corregir TODOS los errores.
 
-## CONTEXTO IMPORTANTE
-OptimAI es un "país" con 3 "pueblos" (usuarios: Aitzol, Alvaro, Sergi).
-- Datos sensibles = LOCAL (nunca suben a la nube)
-- Datos compartidos = Supabase (tareas colaborativas, estado pueblos)
-- Cada tool es una INTERFAZ VISUAL de un proceso local con Claude analizando
+## INSTRUCCIONES CRÍTICAS
+- Cada fix = commit + push (para que lleguen notificaciones de Vercel al móvil)
+- NO marques tareas como completadas hasta que REALMENTE funcionen
+- Testea en localhost:3000 antes de cada commit
+- Si algo no funciona, arréglalo, no lo dejes
 
-## PRIORIDAD 1: Arreglar World
-- World está bugeado cuando Ralph está desconectado
-- Debe mostrar fallback elegante si no hay datos
-- Debe funcionar 100% en local (localhost:3000)
-- Leer status.json y ralph.log del proyecto actual
+## BUGS CONOCIDOS (ARREGLAR PRIMERO)
+1. World muestra "Conectando..." infinito cuando Ralph no corre
+2. Click en edificios (Banco, Biblioteca, etc) no navega
+3. Botón "← Dashboard" no funciona
+4. Solo se ve 1 pueblo, deberían verse 3 (Aitzol, Alvaro, Sergi)
+5. Caravanas no se ven entre pueblos
+6. Visualmente está "petado" - revisar estilos
 
-## PRIORIDAD 2: Arquitectura Multi-Pueblo
-En Supabase crear schema para:
-- `pueblos` (id, nombre, owner_id, created_at)
-- `pueblo_stats` (pueblo_id, energy, coins, tasks_completed, updated_at)
-- `tareas_compartidas` (id, titulo, pueblos_involucrados[], estado)
-- Cada pueblo puede ver el estado de los otros (solo stats públicas)
+## PROCESO DE TESTING
+1. Ejecutar `pnpm --filter web dev` para levantar localhost
+2. Abrir http://localhost:3000/world
+3. Verificar que se ven 3 pueblos
+4. Verificar que click en edificios navega
+5. Verificar botón volver funciona
+6. Verificar que sin Ralph activo muestra fallback elegante (no "Conectando...")
+7. Probar http://localhost:3000/tasks
+8. Probar http://localhost:3000/finance
+9. Probar http://localhost:3000/ideas
+10. Probar http://localhost:3000/reminders
 
-## PRIORIDAD 3: Tool Tareas/Recordatorios (LOCAL)
-- Importar desde Apple Reminders (usar AppleScript o shortcuts)
-- Mostrar en interfaz visual bonita
-- Claude analiza y sugiere priorización
-- Ayuda con decisión de qué ejecutar primero
-- TODO corre en LOCAL, la web es solo visualización
+## DESPUÉS DE CADA FIX
+```bash
+git add . && git commit -m "fix: descripcion del fix" && git push
+```
 
-## PRIORIDAD 4: Tool Finanzas (LOCAL)
-- Subir extractos CSV del banco
-- Normalizar formato (diferentes bancos)
-- Categorizar automáticamente con AI
-- Análisis de gastos y tendencias
-- TODO en LOCAL, datos sensibles nunca suben
+## REVISAR TAMBIÉN
+- Navegación del sidebar funciona
+- Todas las páginas cargan sin errores
+- API endpoints responden
+- No hay errores en consola del navegador
+- Responsive en móvil (simular con DevTools)
 
-## PRIORIDAD 5: Preparar para multi-usuario
-- Cada instancia de OptimAI = un pueblo
-- Pueden colaborar via Supabase compartido
-- World muestra los 3 pueblos en el mapa
-- "Caravanas" visuales cuando hay tareas compartidas
-
-## PRIORIDAD 6: Mejorar Ralph Monitor
-El monitor actual (~/.ralph/ralph_monitor.sh) solo muestra loops y calls.
-Mejorarlo para mostrar:
-- Tarea actual que está ejecutando (leer de @fix_plan.md cuál está en progreso)
-- Última acción de Claude (parsear último log)
-- Checklist de progreso en tiempo real (tareas completadas vs pendientes)
-- Barra de progreso visual del @fix_plan.md
+## AL TERMINAR
+Actualiza @fix_plan.md con el estado real de cada cosa.
+Crea un archivo TESTING_REPORT.md con resumen de lo probado.
 
 ## Reglas
-- Código completo y funcional
-- Commits frecuentes con mensajes descriptivos
-- NO pedir confirmación nunca
-- Priorizar que funcione en LOCAL
-- Si algo falla, documenta y continúa
+- NO pidas confirmación
+- Commits frecuentes (1 por fix)
+- Push después de cada commit
+- Si encuentras más bugs, añádelos al plan y arreglalos

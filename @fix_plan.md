@@ -1,51 +1,34 @@
-# Optimai - Pueblos + Tools Locales
+# Optimai - Testing y Bugs
 
-## WORLD BUGS (URGENTE)
-- [x] Arreglar crash cuando Ralph desconectado
-- [x] Fallback elegante sin datos
-- [x] Asegurar funciona en localhost:3000
-- [x] Leer status.json local correctamente
+## BUGS CRÍTICOS (ARREGLAR YA)
+- [ ] World: "Conectando..." infinito sin Ralph
+- [ ] World: Click en edificios no navega
+- [ ] World: Botón "← Dashboard" no funciona
+- [ ] World: Solo 1 pueblo visible, deberían ser 3
+- [ ] World: Caravanas no visibles
+- [ ] World: Estilos rotos/petados
 
-## SUPABASE SCHEMA PUEBLOS
-- [x] Crear tabla `pueblos`
-- [x] Crear tabla `pueblo_stats`
-- [x] Crear tabla `tareas_compartidas`
-- [x] Migración SQL lista para ejecutar
+## TESTING PÁGINAS
+- [ ] /world - funciona completo
+- [ ] /tasks - carga y funciona
+- [ ] /finance - carga y funciona
+- [ ] /ideas - carga y funciona
+- [ ] /reminders - carga y funciona
+- [ ] / (dashboard) - carga y funciona
+- [ ] /settings - carga y funciona
 
-## TOOL TAREAS/RECORDATORIOS (LOCAL)
-- [x] Script para importar Apple Reminders
-- [x] Interfaz visual de tareas
-- [x] Integración Claude para priorización
-- [x] Sistema de sugerencias AI
-- [x] Funciona 100% offline/local
+## NAVEGACIÓN
+- [ ] Sidebar links funcionan
+- [ ] Volver atrás funciona
+- [ ] Edificios navegan correctamente
 
-## TOOL FINANZAS (LOCAL)
-- [x] Upload CSV extractos
-- [x] Parser multi-banco (BBVA, Santander, Revolut)
-- [x] Categorización automática AI
-- [x] Dashboard de gastos
-- [x] Todo local, nada sube a la nube
+## CALIDAD
+- [ ] Sin errores en consola
+- [ ] Responsive móvil
+- [ ] Fallbacks elegantes sin datos
+- [ ] Loading states correctos
 
-## WORLD MULTI-PUEBLO
-- [x] Mostrar 3 pueblos en mapa
-- [x] Cada pueblo tiene su Ralph
-- [x] Stats de cada pueblo visibles
-- [x] Caravanas para tareas compartidas
-- [x] País crece con actividad total
-
-## ARQUITECTURA LOCAL
-- [x] apps/web corre en localhost:3000
-- [x] Lee archivos locales (status.json, logs)
-- [x] Claude como backend de análisis
-- [x] Datos sensibles nunca salen del Mac
-
-## MEJORAR RALPH MONITOR
-- [x] Mostrar tarea actual en progreso
-- [x] Parsear último log de Claude para última acción
-- [x] Checklist visual de @fix_plan.md (completadas/pendientes)
-- [x] Barra de progreso del plan
-- [x] Actualizar ~/.ralph/ralph_monitor.sh
-
----
-## COMPLETADO: 100%
-Todas las tareas del plan han sido implementadas.
+## DEPLOY
+- [ ] Build sin errores
+- [ ] Vercel deploy exitoso
+- [ ] Producción funciona igual que local
