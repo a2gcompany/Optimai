@@ -6,6 +6,7 @@ export * from './transactions';
 export * from './reminders';
 export * from './categories';
 export * from './ideas';
+export * from './pueblos';
 
 // Re-export repository classes for compatibility
 export { UsersRepository } from './users';
@@ -15,3 +16,12 @@ export { TransactionsRepository } from './transactions';
 export { RemindersRepository } from './reminders';
 export { CategoriesRepository } from './categories';
 export { IdeasRepository } from './ideas';
+
+// Pueblos repositories
+export {
+  pueblosRepository,
+  puebloStatsRepository,
+  tareasCompartidasRepository,
+  caravanasRepository,
+  puebloMessagesRepository,
+} from './pueblos';
