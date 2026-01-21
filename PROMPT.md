@@ -1,55 +1,49 @@
-# OPTIMAI - PRIORIDAD: World View + Monitor Ralph
+# OPTIMAI - Arquitectura Pueblos + Tools Locales
 
 Trabaja 100% autónomo sin pedir confirmación.
 
-## MÁXIMA PRIORIDAD: OPTIMAI WORLD
+## CONTEXTO IMPORTANTE
+OptimAI es un "país" con 3 "pueblos" (usuarios: Aitzol, Alvaro, Sergi).
+- Datos sensibles = LOCAL (nunca suben a la nube)
+- Datos compartidos = Supabase (tareas colaborativas, estado pueblos)
+- Cada tool es una INTERFAZ VISUAL de un proceso local con Claude analizando
 
-Crear apps/world - una vista 2D isométrica tipo pueblo/ciudad donde:
+## PRIORIDAD 1: Arreglar World
+- World está bugeado cuando Ralph está desconectado
+- Debe mostrar fallback elegante si no hay datos
+- Debe funcionar 100% en local (localhost:3000)
+- Leer status.json y ralph.log del proyecto actual
 
-### Edificios (representan módulos)
-- Edificio "HQ" = Dashboard principal
-- Edificio "Bank" = Finanzas
-- Edificio "Workshop" = Tareas
-- Edificio "Library" = Ideas
-- Edificio "Tower" = Core/Telegram
-- Click en edificio = navega al módulo
+## PRIORIDAD 2: Arquitectura Multi-Pueblo
+En Supabase crear schema para:
+- `pueblos` (id, nombre, owner_id, created_at)
+- `pueblo_stats` (pueblo_id, energy, coins, tasks_completed, updated_at)
+- `tareas_compartidas` (id, titulo, pueblos_involucrados[], estado)
+- Cada pueblo puede ver el estado de los otros (solo stats públicas)
 
-### Personaje Ralph
-- Un personaje especial que representa a la IA trabajando
-- Cuando Ralph está ejecutando tareas, se ve construyendo/martillando
-- Cuando está idle, pasea por el pueblo
-- Burbuja de texto mostrando qué está haciendo
+## PRIORIDAD 3: Tool Tareas/Recordatorios (LOCAL)
+- Importar desde Apple Reminders (usar AppleScript o shortcuts)
+- Mostrar en interfaz visual bonita
+- Claude analiza y sugiere priorización
+- Ayuda con decisión de qué ejecutar primero
+- TODO corre en LOCAL, la web es solo visualización
 
-### Personajes Tareas
-- Cada tarea activa = un personaje pequeño
-- Se mueven entre edificios según el tipo de tarea
-- Cuando se completa una tarea, el personaje celebra y desaparece
-- Nuevas tareas = nuevos personajes aparecen
+## PRIORIDAD 4: Tool Finanzas (LOCAL)
+- Subir extractos CSV del banco
+- Normalizar formato (diferentes bancos)
+- Categorizar automáticamente con AI
+- Análisis de gastos y tendencias
+- TODO en LOCAL, datos sensibles nunca suben
 
-### Sistema de Energía/Monedas
-- Barra de energía visible = llamadas API restantes (ej: 45/50)
-- Monedas = tareas completadas hoy
-- La energía se recarga cada hora (visual de reloj)
-- Efecto visual cuando se gasta energía (Ralph trabaja)
-- Efecto visual cuando se gana moneda (tarea completada)
-
-### Estilo Visual
-- Pixel art 2D, vista isométrica o top-down
-- Paleta oscura como el dashboard actual (grises, cyan, verde)
-- Animaciones suaves pero simples
-- Usar canvas HTML5 o Pixi.js
-
-### Panel lateral
-- Stats en tiempo real: energía, monedas, tareas activas
-- Log de actividad de Ralph (últimas 5 acciones)
-- Botón para ver World a pantalla completa
-
-## SECUNDARIO: Conectar datos reales
-- Las stats del World deben leer de Supabase
-- El estado de Ralph debe leer de status.json y ralph.log
-- WebSocket o polling cada 2 segundos para actualizar
+## PRIORIDAD 5: Preparar para multi-usuario
+- Cada instancia de OptimAI = un pueblo
+- Pueden colaborar via Supabase compartido
+- World muestra los 3 pueblos en el mapa
+- "Caravanas" visuales cuando hay tareas compartidas
 
 ## Reglas
 - Código completo y funcional
-- Commits frecuentes
-- NO pedir confirmación
+- Commits frecuentes con mensajes descriptivos
+- NO pedir confirmación nunca
+- Priorizar que funcione en LOCAL
+- Si algo falla, documenta y continúa

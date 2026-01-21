@@ -1,27 +1,40 @@
-# Optimai - World View Priority
+# Optimai - Pueblos + Tools Locales
 
-## WORLD VIEW (HACER PRIMERO)
-- [ ] Crear apps/world con Next.js + canvas
-- [ ] Diseñar mapa 2D con 5 edificios
-- [ ] Implementar personaje Ralph animado
-- [ ] Ralph muestra estado: working/idle
-- [ ] Burbuja de texto con tarea actual
-- [ ] Sistema de energía (API calls restantes)
-- [ ] Sistema de monedas (tareas completadas)
-- [ ] Personajes para tareas activas
-- [ ] Click edificio = navegar a módulo
-- [ ] Panel lateral con stats en tiempo real
-- [ ] Leer status.json para estado de Ralph
-- [ ] Integrar en sidebar del dashboard
+## WORLD BUGS (URGENTE)
+- [ ] Arreglar crash cuando Ralph desconectado
+- [ ] Fallback elegante sin datos
+- [ ] Asegurar funciona en localhost:3000
+- [ ] Leer status.json local correctamente
 
-## DATOS REALES (DESPUES)
-- [ ] Ejecutar schema SQL en Supabase
-- [ ] Conectar World a datos reales
-- [ ] /tareas CRUD funcional
-- [ ] /finanzas funcional
-- [ ] /ideas kanban funcional
+## SUPABASE SCHEMA PUEBLOS
+- [ ] Crear tabla `pueblos`
+- [ ] Crear tabla `pueblo_stats`
+- [ ] Crear tabla `tareas_compartidas`
+- [ ] Migración SQL lista para ejecutar
 
-## POLISH
-- [ ] Animaciones de celebracion
-- [ ] Sonidos opcionales
-- [ ] Responsive para movil
+## TOOL TAREAS/RECORDATORIOS (LOCAL)
+- [ ] Script para importar Apple Reminders
+- [ ] Interfaz visual de tareas
+- [ ] Integración Claude para priorización
+- [ ] Sistema de sugerencias AI
+- [ ] Funciona 100% offline/local
+
+## TOOL FINANZAS (LOCAL)
+- [ ] Upload CSV extractos
+- [ ] Parser multi-banco (BBVA, Santander, Revolut)
+- [ ] Categorización automática AI
+- [ ] Dashboard de gastos
+- [ ] Todo local, nada sube a la nube
+
+## WORLD MULTI-PUEBLO
+- [ ] Mostrar 3 pueblos en mapa
+- [ ] Cada pueblo tiene su Ralph
+- [ ] Stats de cada pueblo visibles
+- [ ] Caravanas para tareas compartidas
+- [ ] País crece con actividad total
+
+## ARQUITECTURA LOCAL
+- [ ] apps/web corre en localhost:3000
+- [ ] Lee archivos locales (status.json, logs)
+- [ ] Claude como backend de análisis
+- [ ] Datos sensibles nunca salen del Mac
