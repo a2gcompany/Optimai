@@ -232,6 +232,26 @@ INSERT INTO reminders (user_id, title, status) VALUES
 
 ---
 
+## GIT WORKFLOW (OBLIGATORIO)
+
+**Haz commit y push después de cada cambio notable:**
+
+1. Después de crear/modificar un archivo importante → commit + push
+2. Después de completar un paso de implementación → commit + push
+3. Después de arreglar un bug o error → commit + push
+4. Máximo 2-3 archivos por commit (commits pequeños y frecuentes)
+
+**Formato de commits:**
+```bash
+git add <archivos_específicos>
+git commit -m "feat|fix|docs: descripción corta"
+git push origin main
+```
+
+**NO acumules cambios.** Push frecuente = progreso visible.
+
+---
+
 ## OUTPUT ESPERADO
 
 Al finalizar, reportar:
