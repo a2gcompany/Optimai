@@ -147,6 +147,48 @@ async function readLocalStatus(): Promise<{ status: LocalStatus | null; progress
   }
 }
 
+// Get Ralph status from Supabase (synced from local Ralph)
+interface SupabaseRalphStatus {
+  project: string;
+  timestamp: string;
+  loop_count: number;
+  calls_made_this_hour: number;
+  max_calls_per_hour: number;
+  last_action: string;
+  status: string;
+  exit_reason: string;
+}
+
+async function getSupabaseRalphStatus(project: string = 'Optimai'): Promise<SupabaseRalphStatus | null> {
+  try {
+    const { data, error } = await supabase
+      .from('ralph_status')
+      .select('*')
+      .eq('project', project)
+      .single();
+
+    if (error || !data) return null;
+
+    // Check if status is recent (within last 5 minutes)
+    const statusTime = new Date(data.timestamp).getTime();
+    const now = Date.now();
+    const fiveMinutes = 5 * 60 * 1000;
+
+    if (now - statusTime > fiveMinutes) {
+      // Status is stale, Ralph might be stopped
+      return {
+        ...data,
+        status: 'stale',
+        last_action: 'disconnected'
+      };
+    }
+
+    return data;
+  } catch {
+    return null;
+  }
+}
+
 // Get stats from Supabase
 async function getSupabaseStats() {
   try {
@@ -177,13 +219,17 @@ function formatTime(date: Date): string {
 
 export async function GET() {
   try {
-    // 1. Try to read local status files first
+    // 1. Try to read local status files first (localhost only)
     const { status: localStatus, progress: localProgress } = await readLocalStatus();
 
-    // 2. Get stats from Supabase (shared data)
+    // 2. Try to get Ralph status from Supabase (for Vercel/remote access)
+    const supabaseRalphStatus = await getSupabaseRalphStatus('Optimai');
+
+    // 3. Get general stats from Supabase (shared data)
     const supabaseStats = await getSupabaseStats();
 
-    // 3. Determine source and build response
+    // 4. Determine source and build response
+    // Priority: local → supabase ralph_status → supabase stats → fallback
     let source: RalphStatus['source'] = 'fallback';
     let state: RalphStatus['state'] = 'idle';
     let currentTask = 'Sin conexión';
@@ -194,7 +240,7 @@ export async function GET() {
     let nextReset = '';
 
     if (localStatus) {
-      // Local status available - this is the primary source
+      // Local status available - this is the primary source (localhost)
       source = 'local';
       state = mapStatusToState(localStatus.status, localStatus.last_action);
       currentTask = localProgress?.status || localStatus.last_action || 'Procesando';
@@ -203,12 +249,27 @@ export async function GET() {
       callsThisHour = localStatus.calls_made_this_hour;
       maxCalls = localStatus.max_calls_per_hour;
       nextReset = localStatus.next_reset;
+    } else if (supabaseRalphStatus) {
+      // Ralph status from Supabase - synced from local Ralph (for Vercel)
+      source = 'supabase';
+      state = mapStatusToState(supabaseRalphStatus.status, supabaseRalphStatus.last_action);
+      currentTask = supabaseRalphStatus.last_action || 'Procesando';
+      speechBubble = getSpeechBubble(state, supabaseRalphStatus.last_action, supabaseRalphStatus.status);
+      loopCount = supabaseRalphStatus.loop_count;
+      callsThisHour = supabaseRalphStatus.calls_made_this_hour;
+      maxCalls = supabaseRalphStatus.max_calls_per_hour;
+
+      // Calculate next reset from timestamp
+      const statusTime = new Date(supabaseRalphStatus.timestamp);
+      const nextResetDate = new Date(statusTime);
+      nextResetDate.setHours(nextResetDate.getHours() + 1, 0, 0, 0);
+      nextReset = nextResetDate.toISOString();
     } else if (supabaseStats) {
-      // No local status but Supabase is available
+      // No Ralph status but Supabase stats available
       source = 'supabase';
       state = supabaseStats.tasksPending > 0 ? 'thinking' : 'idle';
       currentTask = supabaseStats.tasksPending > 0 ? 'Tareas pendientes en cola' : 'Sin tareas activas';
-      speechBubble = 'Conectado a la nube';
+      speechBubble = 'Conectado a la nube (Ralph offline)';
 
       // Simulate energy based on time
       const now = new Date();
