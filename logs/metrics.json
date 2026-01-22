@@ -1,0 +1,12 @@
+{
+    "project": "Optimai",
+    "created_at": "2026-01-22T22:57:22+08:00",
+    "total_time_seconds": 0,
+    "total_loops": 0,
+    "total_tasks_completed": 0,
+    "total_api_calls": 0,
+    "total_input_tokens": 0,
+    "total_output_tokens": 0,
+    "estimated_cost_usd": 0.0,
+    "sessions": []
+}

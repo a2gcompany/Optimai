@@ -1,4 +1,6 @@
-import { supabase } from '../supabase';
+import { getSupabaseClient } from '../client';
+
+const supabase = getSupabaseClient();
 
 // ============================================================================
 // TYPES

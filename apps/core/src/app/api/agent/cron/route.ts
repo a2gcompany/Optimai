@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { RemindersRepository, UsersRepository } from '@optimai/db';
+import { RemindersRepository, UsersRepository, User } from '@optimai/db';
 import { sendMessage } from '@/lib/telegram';
 import type { Reminder } from '@optimai/types';
 
@@ -92,7 +92,7 @@ async function getPendingReminders(now: Date): Promise<Reminder[]> {
   // (scheduled_at <= now AND sent_at IS NULL)
   const allReminders = await RemindersRepository.findPending();
 
-  return allReminders.filter((r) => {
+  return allReminders.filter((r: Reminder) => {
     const scheduledAt = new Date(r.scheduled_at);
     return scheduledAt <= now && !r.sent_at;
   });
@@ -140,7 +140,7 @@ async function processDailySummaries(now: Date): Promise<void> {
   // Get users with daily summaries enabled
   const users = await UsersRepository.findAll();
   const eligibleUsers = users.filter(
-    (u) => u.is_active && u.preferences.daily_summary_time
+    (u: User) => u.is_active && (u as Record<string, unknown>).preferences?.daily_summary_time
   );
 
   for (const user of eligibleUsers) {

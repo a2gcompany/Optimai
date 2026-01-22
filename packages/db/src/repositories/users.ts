@@ -93,7 +93,7 @@ export async function createUser(user: UserInsert): Promise<User> {
 
   const { data, error } = await supabase
     .from('nucleus_users')
-    .insert(nucleusUser)
+    .insert(nucleusUser as never)
     .select()
     .single();
 
@@ -101,7 +101,7 @@ export async function createUser(user: UserInsert): Promise<User> {
 
   // Return with extended fields
   return {
-    ...data,
+    ...(data as User),
     telegram_id: user.telegram_id,
     telegram_username: user.telegram_username,
     first_name: user.first_name,
@@ -127,13 +127,13 @@ export async function updateUser(id: string, updates: UserUpdate): Promise<User>
 
   const { data, error } = await supabase
     .from('nucleus_users')
-    .update(nucleusUpdates)
+    .update(nucleusUpdates as never)
     .eq('id', id)
     .select()
     .single();
 
   if (error) throw error;
-  return data;
+  return data as User;
 }
 
 export async function upsertUserByTelegramId(
@@ -178,6 +178,20 @@ export async function getAdminUsers(): Promise<User[]> {
   return data || [];
 }
 
+export async function getAllUsers(limit = 100): Promise<User[]> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from('nucleus_users')
+    .select('*')
+    .limit(limit);
+
+  if (error) {
+    console.error('getAllUsers error:', error);
+    return [];
+  }
+  return data || [];
+}
+
 // Class-based repository for compatibility with existing code
 export const UsersRepository = {
   findById: getUserById,
@@ -187,4 +201,5 @@ export const UsersRepository = {
   upsert: upsertUserByTelegramId,
   getActive: getActiveUsers,
   getAdmins: getAdminUsers,
+  findAll: getAllUsers,
 };

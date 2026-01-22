@@ -100,14 +100,14 @@ export async function createTask(task: TaskInsert): Promise<Task> {
 
   const { data, error } = await supabase
     .from('dev_tasks')
-    .insert(devTask)
+    .insert(devTask as never)
     .select()
     .single();
 
   if (error) throw error;
 
   return {
-    ...data,
+    ...(data as Task),
     user_id: task.user_id,
     due_date: task.due_date,
     tags: task.tags || [],
@@ -129,13 +129,13 @@ export async function updateTask(id: string, updates: TaskUpdate): Promise<Task>
 
   const { data, error } = await supabase
     .from('dev_tasks')
-    .update(devUpdates)
+    .update(devUpdates as never)
     .eq('id', id)
     .select()
     .single();
 
   if (error) throw error;
-  return data;
+  return data as Task;
 }
 
 export async function completeTask(id: string): Promise<Task> {

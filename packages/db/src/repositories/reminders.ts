@@ -204,6 +204,7 @@ export const RemindersRepository = {
   markSent: markReminderAsSent,
   delete: deleteReminder,
   getPending: getPendingReminders,
+  findPending: getPendingReminders, // Alias for compatibility
   getUpcoming: getUpcomingReminders,
   getAll: getAllReminders,
 };
