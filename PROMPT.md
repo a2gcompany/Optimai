@@ -1,43 +1,64 @@
-# OPTIMAI - Funcionalidad 100%
+# OPTIMAI WORLD - Estilo Thronglets/Pixel Art Isométrico
 
-Trabaja 100% autónomo. Enfócate en que TODO funcione perfecto.
+Trabaja 100% autónomo. Crea un World View tipo videojuego retro.
 
-## PRIORIDAD MÁXIMA: World 2D Simple
+## REFERENCIA VISUAL: Thronglets (Black Mirror)
+- Perspectiva isométrica 2D (~30° desde arriba)
+- Tiles en forma de ROMBO/diamante (no cuadrados)
+- Estética PIXEL ART con píxeles visibles
+- Paleta de colores limitada y armónica (tema oscuro)
 
-El World 3D/isométrico se ve mal. Simplificarlo a 2D limpio:
-- Vista top-down simple (como un mapa)
-- Rectángulos/cuadrados para edificios
-- Colores sólidos del tema oscuro actual
-- Sin efectos 3D ni isométricos
+## ELEMENTOS DEL MUNDO
+
+### Terreno (Grid isométrico)
+- Base de tiles de césped/suelo en tonos oscuros
+- Variaciones sutiles de color entre tiles
+- Caminos entre edificios
+- Decoraciones: árboles pixelados, rocas, flores
+
+### Edificios (Como casitas pixel art)
+- HQ: Edificio principal grande (azul/cyan)
+- Taller: Casa con herramientas (naranja)
+- Banco: Edificio con monedas (verde)
+- Biblioteca: Casa con libros (morado)
+- Torre: Estructura alta (rojo)
 - Click en edificio = navega al módulo
-- Ralph como un icono simple que se mueve
-- Tareas como puntos/iconos pequeños
 
-## PRIORIDAD 2: Todos los botones funcionando
+### Personaje Ralph
+- Sprite pixel art pequeño (~16x16 o 32x32 px)
+- Animación idle: respira/parpadea
+- Animación working: martilla/construye
+- Se mueve entre edificios
+- Burbuja de texto con tarea actual
 
-Verificar y arreglar:
-- Click en cada edificio del World navega correctamente
-- Botón "← Dashboard" vuelve al dashboard
-- Sidebar: todos los links funcionan
-- Cada página carga sin errores
+### Tareas como criaturas/NPCs
+- Cada tarea activa = un personaje pequeño
+- Se mueven por el mapa
+- Desaparecen con efecto cuando se completan
 
-## PRIORIDAD 3: Páginas funcionales
+## UI (Estilo retro)
+- Panel lateral derecho con:
+  - Energía: barra pixel art (calls API restantes)
+  - Monedas: contador pixelado (tareas completadas)
+  - Lista de tareas activas
+- Botones pixelados para navegación
 
-- /tasks - CRUD funciona
-- /finance - muestra datos, upload CSV
-- /ideas - kanban drag & drop
-- /reminders - CRUD funciona
-- /settings - guarda configuración
-- Dashboard - stats visibles
+## IMPLEMENTACIÓN TÉCNICA
+- Usar Canvas HTML5
+- Sprites pueden ser emojis o caracteres Unicode inicialmente
+- O crear sprites simples con CSS/divs
+- Grid isométrico: x' = (x - y) * tileWidth/2, y' = (x + y) * tileHeight/2
 
 ## PROCESO
-1. Simplificar World a 2D
-2. Testear cada botón
-3. Arreglar lo que no funcione
-4. Commit después de cada fix
+1. Crear grid isométrico básico
+2. Añadir edificios como sprites
+3. Añadir Ralph animado
+4. Añadir UI lateral
+5. Conectar navegación
+6. Añadir efectos y polish
 
 ## REGLAS
-- Código limpio y simple
-- Sin efectos fancy que no funcionen
-- Testear en localhost:3000 antes de commit
-- Commits frecuentes: git add . && git commit -m "fix: descripcion" && git push
+- Código funcional, no esqueletos
+- Commits frecuentes
+- Testear en localhost antes de push
+- Push después de cada mejora significativa

@@ -1,40 +1,40 @@
-# Optimai - Funcionalidad 100%
+# Optimai World - Pixel Art Isométrico
 
-## WORLD 2D (COMPLETADO)
-- [x] Eliminar vista isométrica/3D
-- [x] Crear vista 2D top-down simple
-- [x] Edificios como rectángulos con colores sólidos
-- [x] Ralph como icono simple (círculo)
-- [x] Click en edificio navega al módulo
-- [x] Sin animaciones complejas
-- [x] Responsive y limpio
+## GRID ISOMÉTRICO
+- [ ] Crear sistema de tiles en rombo
+- [ ] Renderizar grid base con canvas
+- [ ] Añadir variaciones de terreno (césped oscuro)
+- [ ] Caminos entre edificios
 
-## NAVEGACIÓN (COMPLETADO)
-- [x] Click HQ → /
-- [x] Click Taller → /tasks
-- [x] Click Banco → /finance
-- [x] Click Biblioteca → /ideas
-- [x] Click Torre → /reminders
-- [x] Click Config → /settings
-- [x] Botón "← Dashboard" funciona
-- [x] Sidebar links funcionan todos
+## EDIFICIOS PIXEL ART
+- [ ] HQ (edificio principal, cyan)
+- [ ] Taller (naranja, herramientas)
+- [ ] Banco (verde, monedas)
+- [ ] Biblioteca (morado, libros)
+- [ ] Torre (rojo, alta)
+- [ ] Click en edificio navega
 
-## PÁGINAS (COMPLETADO)
-- [x] / (dashboard) - carga stats
-- [x] /tasks - CRUD completo
-- [x] /finance - muestra transacciones
-- [x] /ideas - kanban funcional
-- [x] /reminders - CRUD completo
-- [x] /settings - guarda config
-- [x] /world - vista 2D limpia
+## RALPH (PERSONAJE)
+- [ ] Sprite pixel art de Ralph
+- [ ] Animación idle (respira)
+- [ ] Animación working (martilla)
+- [ ] Movimiento entre edificios
+- [ ] Burbuja de texto con tarea
 
-## CALIDAD (COMPLETADO)
-- [x] Sin errores en consola
-- [x] Todo clickeable responde
-- [x] Loading states correctos
-- [x] Fallbacks cuando no hay datos
+## TAREAS COMO NPCs
+- [ ] Sprites para tareas activas
+- [ ] Movimiento por el mapa
+- [ ] Efecto al completar tarea
 
----
-**Estado:** 100% completado
-**Commit:** `28755ee feat: replace isometric World with simple 2D grid layout`
-**Deploy:** Vercel auto-deploy activo
+## UI RETRO
+- [ ] Panel lateral derecho
+- [ ] Barra de energía pixelada
+- [ ] Contador de monedas
+- [ ] Lista de tareas
+- [ ] Botones de navegación
+
+## POLISH
+- [ ] Decoraciones (árboles, rocas)
+- [ ] Efectos de partículas
+- [ ] Transiciones suaves
+- [ ] Sonidos opcionales
