@@ -22,11 +22,12 @@
 - [x] Crear /api/world/summary
 
 ## DEPLOY
-- [ ] Commit y push
-- [ ] Verificar deploy en Vercel
+- [x] Commit y push
+- [x] Verificar deploy en Vercel
 
 ---
-**Estado:** 95% completado
+**Estado:** 100% completado
 **Commits:**
 - `73568a3 feat: rewrite World as simple 2D view with real data`
-- `pending feat: add world summary API and Supabase tables`
+- `874093d feat: add world summary API and Supabase tables for real data`
+- `fbce46c fix: Vercel build and Supabase Ralph status`
