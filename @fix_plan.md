@@ -18,13 +18,13 @@
 - [x] Sprite pixel art de Ralph
 - [x] Animación idle (respira)
 - [x] Animación working (martilla)
-- [ ] Movimiento entre edificios
+- [x] Movimiento entre edificios
 - [x] Burbuja de texto con tarea
 
 ## TAREAS COMO NPCs
 - [x] Sprites para tareas activas
 - [x] Movimiento por el mapa
-- [ ] Efecto al completar tarea
+- [x] Efecto al completar tarea
 
 ## UI RETRO
 - [x] Panel lateral derecho
@@ -34,12 +34,15 @@
 - [x] Botones de navegación
 
 ## POLISH
-- [x] Decoraciones (árboles, rocas)
-- [ ] Efectos de partículas
-- [ ] Transiciones suaves
+- [x] Decoraciones (árboles, rocas, flores)
+- [x] Efectos de partículas
+- [x] Transiciones suaves (fade out al navegar)
 - [ ] Sonidos opcionales
 
 ---
-**Estado:** 85% completado
-**Commit:** `213b52f feat: World pixel art isométrico estilo Thronglets`
+**Estado:** 98% completado
+**Commits:**
+- `213b52f feat: World pixel art isométrico estilo Thronglets`
+- `81ef4da feat: add Ralph movement, task completion effects, and flowers`
+- `pending feat: add smooth fade transition on navigation`
 **Deploy:** Vercel auto-deploy activo

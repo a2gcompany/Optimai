@@ -445,6 +445,8 @@ export default function WorldPage() {
   const [taskList, setTaskList] = useState<Array<{ id: string; title: string; status: string }>>([]);
   const [particles, setParticles] = useState<Particle[]>([]);
   const [ralphDestination, setRalphDestination] = useState<string | null>(null);
+  const [fadeOut, setFadeOut] = useState(false);
+  const [fadeTarget, setFadeTarget] = useState<string | null>(null);
 
   // Fetch status
   useEffect(() => {
@@ -647,10 +649,14 @@ export default function WorldPage() {
       ) {
         // Make Ralph walk to building first
         setRalphDestination(building.id);
-        // Navigate after a short delay
+        // Start fade out transition then navigate
+        setTimeout(() => {
+          setFadeOut(true);
+          setFadeTarget(building.route);
+        }, 600);
         setTimeout(() => {
           router.push(building.route);
-        }, 800);
+        }, 1200);
         return;
       }
     }
@@ -778,7 +784,7 @@ export default function WorldPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white flex">
+    <div className={`min-h-screen bg-slate-900 text-white flex transition-opacity duration-500 ${fadeOut ? 'opacity-0' : 'opacity-100'}`}>
       {/* Main Canvas Area */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
@@ -814,7 +820,13 @@ export default function WorldPage() {
 
         {/* Footer hint */}
         <div className="text-center pb-4 text-slate-500 text-sm font-mono">
-          Click en un edificio para navegar
+          {fadeTarget ? (
+            <span className="text-cyan-400 animate-pulse">
+              Viajando a {BUILDINGS.find(b => b.route === fadeTarget)?.name}...
+            </span>
+          ) : (
+            'Click en un edificio para navegar'
+          )}
         </div>
       </div>
 
