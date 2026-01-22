@@ -28,6 +28,18 @@ interface Task {
   targetX: number;
   targetY: number;
   color: string;
+  completing?: boolean;
+  completingFrame?: number;
+}
+
+interface Particle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  color: string;
+  life: number;
+  maxLife: number;
 }
 
 interface RalphState {
@@ -257,6 +269,28 @@ function drawTask(
   const { x, y } = isoToScreen(task.gridX, task.gridY, offsetX, offsetY);
   const bounce = Math.sin(frame * 0.15 + task.gridX) * 3;
 
+  // Handle completing animation
+  if (task.completing) {
+    const progress = (task.completingFrame || 0) / 30;
+    const scale = 1 + progress * 0.5;
+    const alpha = 1 - progress;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(x, y - 10);
+    ctx.scale(scale, scale);
+    ctx.fillStyle = task.color;
+    ctx.beginPath();
+    ctx.arc(0, 0, 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 12px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('✓', 0, 4);
+    ctx.restore();
+    return;
+  }
+
   // Shadow
   ctx.fillStyle = 'rgba(0,0,0,0.2)';
   ctx.beginPath();
@@ -334,6 +368,50 @@ function drawDecorations(
     ctx.ellipse(x - 2, y - 7, 4, 3, 0, 0, Math.PI * 2);
     ctx.fill();
   });
+
+  // Flowers
+  const flowers = [
+    { x: 4, y: 2, color: '#f472b6' },
+    { x: 7, y: 1, color: '#fbbf24' },
+    { x: 1, y: 7, color: '#a78bfa' },
+    { x: 10, y: 8, color: '#f472b6' },
+    { x: 8, y: 10, color: '#fbbf24' },
+    { x: 3, y: 10, color: '#60a5fa' },
+    { x: 6, y: 11, color: '#a78bfa' },
+  ];
+
+  flowers.forEach(flower => {
+    const { x, y } = isoToScreen(flower.x, flower.y, offsetX, offsetY);
+    // Stem
+    ctx.fillStyle = '#22c55e';
+    ctx.fillRect(x - 1, y - 8, 2, 8);
+    // Petals
+    ctx.fillStyle = flower.color;
+    for (let i = 0; i < 5; i++) {
+      const angle = (i / 5) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.arc(x + Math.cos(angle) * 4, y - 10 + Math.sin(angle) * 3, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Center
+    ctx.fillStyle = '#fbbf24';
+    ctx.beginPath();
+    ctx.arc(x, y - 10, 2, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+function drawParticles(
+  ctx: CanvasRenderingContext2D,
+  particles: Particle[]
+) {
+  particles.forEach(p => {
+    const alpha = p.life / p.maxLife;
+    ctx.fillStyle = p.color + Math.floor(alpha * 255).toString(16).padStart(2, '0');
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3 * alpha, 0, Math.PI * 2);
+    ctx.fill();
+  });
 }
 
 // ============================================================================
@@ -365,6 +443,8 @@ export default function WorldPage() {
   });
   const [isConnected, setIsConnected] = useState(true);
   const [taskList, setTaskList] = useState<Array<{ id: string; title: string; status: string }>>([]);
+  const [particles, setParticles] = useState<Particle[]>([]);
+  const [ralphDestination, setRalphDestination] = useState<string | null>(null);
 
   // Fetch status
   useEffect(() => {
@@ -408,6 +488,15 @@ export default function WorldPage() {
   useEffect(() => {
     const interval = setInterval(() => {
       setTasks(prev => prev.map(task => {
+        // Handle completing animation
+        if (task.completing) {
+          const newFrame = (task.completingFrame || 0) + 1;
+          if (newFrame > 30) {
+            return null as unknown as Task; // Will be filtered out
+          }
+          return { ...task, completingFrame: newFrame };
+        }
+
         const dx = task.targetX - task.gridX;
         const dy = task.targetY - task.gridY;
         const dist = Math.sqrt(dx * dx + dy * dy);
@@ -426,10 +515,112 @@ export default function WorldPage() {
           gridX: task.gridX + (dx / dist) * 0.05,
           gridY: task.gridY + (dy / dist) * 0.05,
         };
-      }));
+      }).filter(Boolean));
     }, 50);
     return () => clearInterval(interval);
   }, []);
+
+  // Move Ralph to destination
+  useEffect(() => {
+    if (!ralphDestination) return;
+
+    const targetBuilding = BUILDINGS.find(b => b.id === ralphDestination);
+    if (!targetBuilding) return;
+
+    const interval = setInterval(() => {
+      setRalph(prev => {
+        const dx = targetBuilding.gridX + 0.5 - prev.gridX;
+        const dy = targetBuilding.gridY + 0.5 - prev.gridY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < 0.2) {
+          setRalphDestination(null);
+          return {
+            ...prev,
+            gridX: targetBuilding.gridX + 0.5,
+            gridY: targetBuilding.gridY + 0.5,
+            status: 'idle',
+          };
+        }
+
+        return {
+          ...prev,
+          gridX: prev.gridX + (dx / dist) * 0.08,
+          gridY: prev.gridY + (dy / dist) * 0.08,
+          status: 'walking',
+        };
+      });
+    }, 50);
+
+    return () => clearInterval(interval);
+  }, [ralphDestination]);
+
+  // Update particles
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setParticles(prev => prev
+        .map(p => ({
+          ...p,
+          x: p.x + p.vx,
+          y: p.y + p.vy,
+          vy: p.vy + 0.2, // gravity
+          life: p.life - 1,
+        }))
+        .filter(p => p.life > 0)
+      );
+    }, 30);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Function to complete a task with effect
+  const completeTask = useCallback((taskId: string) => {
+    setTasks(prev => {
+      const task = prev.find(t => t.id === taskId);
+      if (!task) return prev;
+
+      // Create particles at task position
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const offsetX = canvas.width / 2;
+        const offsetY = 100;
+        const { x, y } = isoToScreen(task.gridX, task.gridY, offsetX, offsetY);
+
+        const newParticles: Particle[] = [];
+        for (let i = 0; i < 12; i++) {
+          newParticles.push({
+            x,
+            y: y - 10,
+            vx: (Math.random() - 0.5) * 8,
+            vy: -Math.random() * 6 - 2,
+            color: task.color,
+            life: 30,
+            maxLife: 30,
+          });
+        }
+        setParticles(p => [...p, ...newParticles]);
+      }
+
+      return prev.map(t =>
+        t.id === taskId ? { ...t, completing: true, completingFrame: 0 } : t
+      );
+    });
+    setCoins(c => c + 10);
+  }, []);
+
+  // Auto-complete a random task periodically (demo)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTasks(prev => {
+        const availableTasks = prev.filter(t => !t.completing);
+        if (availableTasks.length > 0 && Math.random() > 0.7) {
+          const randomTask = availableTasks[Math.floor(Math.random() * availableTasks.length)];
+          completeTask(randomTask.id);
+        }
+        return prev;
+      });
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [completeTask]);
 
   // Handle click
   const handleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -454,7 +645,12 @@ export default function WorldPage() {
         y > pos.y - buildingHeight - 30 &&
         y < pos.y + TILE_HEIGHT / 2 * building.height
       ) {
-        router.push(building.route);
+        // Make Ralph walk to building first
+        setRalphDestination(building.id);
+        // Navigate after a short delay
+        setTimeout(() => {
+          router.push(building.route);
+        }, 800);
         return;
       }
     }
@@ -552,6 +748,9 @@ export default function WorldPage() {
       // Draw Ralph
       drawRalph(ctx, ralph, offsetX, offsetY, frame);
 
+      // Draw particles
+      drawParticles(ctx, particles);
+
       animationRef.current = requestAnimationFrame(render);
     };
 
@@ -562,7 +761,7 @@ export default function WorldPage() {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [hoveredBuilding, ralph, tasks]);
+  }, [hoveredBuilding, ralph, tasks, particles]);
 
   // Handle resize
   useEffect(() => {
