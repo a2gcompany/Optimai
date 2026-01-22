@@ -1,40 +1,45 @@
 # Optimai World - Pixel Art Isométrico
 
 ## GRID ISOMÉTRICO
-- [ ] Crear sistema de tiles en rombo
-- [ ] Renderizar grid base con canvas
-- [ ] Añadir variaciones de terreno (césped oscuro)
-- [ ] Caminos entre edificios
+- [x] Crear sistema de tiles en rombo
+- [x] Renderizar grid base con canvas
+- [x] Añadir variaciones de terreno (césped oscuro)
+- [x] Caminos entre edificios
 
 ## EDIFICIOS PIXEL ART
-- [ ] HQ (edificio principal, cyan)
-- [ ] Taller (naranja, herramientas)
-- [ ] Banco (verde, monedas)
-- [ ] Biblioteca (morado, libros)
-- [ ] Torre (rojo, alta)
-- [ ] Click en edificio navega
+- [x] HQ (edificio principal, cyan)
+- [x] Taller (naranja, herramientas)
+- [x] Banco (verde, monedas)
+- [x] Biblioteca (morado, libros)
+- [x] Torre (rojo, alta)
+- [x] Click en edificio navega
 
 ## RALPH (PERSONAJE)
-- [ ] Sprite pixel art de Ralph
-- [ ] Animación idle (respira)
-- [ ] Animación working (martilla)
+- [x] Sprite pixel art de Ralph
+- [x] Animación idle (respira)
+- [x] Animación working (martilla)
 - [ ] Movimiento entre edificios
-- [ ] Burbuja de texto con tarea
+- [x] Burbuja de texto con tarea
 
 ## TAREAS COMO NPCs
-- [ ] Sprites para tareas activas
-- [ ] Movimiento por el mapa
+- [x] Sprites para tareas activas
+- [x] Movimiento por el mapa
 - [ ] Efecto al completar tarea
 
 ## UI RETRO
-- [ ] Panel lateral derecho
-- [ ] Barra de energía pixelada
-- [ ] Contador de monedas
-- [ ] Lista de tareas
-- [ ] Botones de navegación
+- [x] Panel lateral derecho
+- [x] Barra de energía pixelada
+- [x] Contador de monedas
+- [x] Lista de tareas
+- [x] Botones de navegación
 
 ## POLISH
-- [ ] Decoraciones (árboles, rocas)
+- [x] Decoraciones (árboles, rocas)
 - [ ] Efectos de partículas
 - [ ] Transiciones suaves
 - [ ] Sonidos opcionales
+
+---
+**Estado:** 85% completado
+**Commit:** `213b52f feat: World pixel art isométrico estilo Thronglets`
+**Deploy:** Vercel auto-deploy activo
