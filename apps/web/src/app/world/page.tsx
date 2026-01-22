@@ -53,6 +53,102 @@ interface RalphState {
 }
 
 // ============================================================================
+// SOUND SYSTEM (Web Audio API - retro 8-bit style)
+// ============================================================================
+
+class RetroSounds {
+  private ctx: AudioContext | null = null;
+  private enabled = true;
+
+  private getContext() {
+    if (!this.ctx) {
+      this.ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+    }
+    return this.ctx;
+  }
+
+  toggle() {
+    this.enabled = !this.enabled;
+    return this.enabled;
+  }
+
+  isEnabled() {
+    return this.enabled;
+  }
+
+  // Click sound - short blip
+  click() {
+    if (!this.enabled) return;
+    const ctx = this.getContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(800, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(400, ctx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.1);
+  }
+
+  // Task complete - cheerful arpeggio
+  taskComplete() {
+    if (!this.enabled) return;
+    const ctx = this.getContext();
+    const notes = [523, 659, 784, 1047]; // C5, E5, G5, C6
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.08);
+      gain.gain.setValueAtTime(0.08, ctx.currentTime + i * 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.08 + 0.15);
+      osc.start(ctx.currentTime + i * 0.08);
+      osc.stop(ctx.currentTime + i * 0.08 + 0.15);
+    });
+  }
+
+  // Walk sound - soft footstep
+  walk() {
+    if (!this.enabled) return;
+    const ctx = this.getContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(150 + Math.random() * 50, ctx.currentTime);
+    gain.gain.setValueAtTime(0.03, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.05);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.05);
+  }
+
+  // Navigate sound - whoosh
+  navigate() {
+    if (!this.enabled) return;
+    const ctx = this.getContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(200, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.2);
+    gain.gain.setValueAtTime(0.05, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.2);
+  }
+}
+
+const sounds = new RetroSounds();
+
+// ============================================================================
 // CONSTANTS
 // ============================================================================
 
@@ -447,6 +543,8 @@ export default function WorldPage() {
   const [ralphDestination, setRalphDestination] = useState<string | null>(null);
   const [fadeOut, setFadeOut] = useState(false);
   const [fadeTarget, setFadeTarget] = useState<string | null>(null);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const walkSoundRef = useRef(0);
 
   // Fetch status
   useEffect(() => {
@@ -529,7 +627,14 @@ export default function WorldPage() {
     const targetBuilding = BUILDINGS.find(b => b.id === ralphDestination);
     if (!targetBuilding) return;
 
+    let stepCount = 0;
     const interval = setInterval(() => {
+      stepCount++;
+      // Play walk sound every 4th step
+      if (stepCount % 4 === 0) {
+        sounds.walk();
+      }
+
       setRalph(prev => {
         const dx = targetBuilding.gridX + 0.5 - prev.gridX;
         const dy = targetBuilding.gridY + 0.5 - prev.gridY;
@@ -576,6 +681,9 @@ export default function WorldPage() {
 
   // Function to complete a task with effect
   const completeTask = useCallback((taskId: string) => {
+    // Play task complete sound
+    sounds.taskComplete();
+
     setTasks(prev => {
       const task = prev.find(t => t.id === taskId);
       if (!task) return prev;
@@ -647,10 +755,13 @@ export default function WorldPage() {
         y > pos.y - buildingHeight - 30 &&
         y < pos.y + TILE_HEIGHT / 2 * building.height
       ) {
+        // Play click sound
+        sounds.click();
         // Make Ralph walk to building first
         setRalphDestination(building.id);
         // Start fade out transition then navigate
         setTimeout(() => {
+          sounds.navigate();
           setFadeOut(true);
           setFadeTarget(building.route);
         }, 600);
@@ -799,10 +910,21 @@ export default function WorldPage() {
               </button>
               <h1 className="text-lg font-bold font-mono">🏘️ Pueblo de Aitzol</h1>
             </div>
-            <div className={`px-3 py-1 rounded text-xs font-mono ${
-              isConnected ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-            }`}>
-              {isConnected ? '● Online' : '○ Offline'}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setSoundEnabled(sounds.toggle())}
+                className={`px-2 py-1 rounded text-xs font-mono transition-colors ${
+                  soundEnabled ? 'bg-cyan-500/20 text-cyan-400' : 'bg-slate-600/50 text-slate-500'
+                }`}
+                title={soundEnabled ? 'Silenciar' : 'Activar sonido'}
+              >
+                {soundEnabled ? '🔊' : '🔇'}
+              </button>
+              <div className={`px-3 py-1 rounded text-xs font-mono ${
+                isConnected ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+              }`}>
+                {isConnected ? '● Online' : '○ Offline'}
+              </div>
             </div>
           </div>
         </header>

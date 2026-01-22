@@ -37,12 +37,12 @@
 - [x] Decoraciones (árboles, rocas, flores)
 - [x] Efectos de partículas
 - [x] Transiciones suaves (fade out al navegar)
-- [ ] Sonidos opcionales
+- [x] Sonidos 8-bit retro (Web Audio API)
 
 ---
-**Estado:** 98% completado
+**Estado:** 100% completado
 **Commits:**
 - `213b52f feat: World pixel art isométrico estilo Thronglets`
 - `81ef4da feat: add Ralph movement, task completion effects, and flowers`
-- `pending feat: add smooth fade transition on navigation`
+- `fe889c9 feat: add smooth fade transition on building navigation`
 **Deploy:** Vercel auto-deploy activo
