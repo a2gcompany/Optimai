@@ -1,234 +1,127 @@
-# Prompt para Ralph - Rebuild World View (Optimai)
+# Prompt para Ralph - Tasks & Reminders Unificado
 
 **Repo:** `a2gcompany/Optimai`
-**Objetivo:** Reconstruir la vista "World" como dashboard 2D retro (estilo Game Boy/NES)
+**Objetivo:** Crear herramienta unificada de Tareas + Recordatorios con importación manual
 
 ---
 
-## REGLAS ABSOLUTAS
+## CONCEPTO
 
-1. **NO isométrico** - Eliminar todo código iso del World
-2. **NO datos falsos** - Prohibido: `Math.random()`, timestamps dummy, contadores hardcodeados
-3. **NO animaciones fake** - Ralph se mueve SOLO cuando hay cambio real en DB
-4. **TODO desde Supabase** - Server components o route handlers (nunca exponer keys)
-5. **Robusto** - Manejar loading, empty states, offline
+Fusionar Tasks y Reminders en una sola herramienta. La lógica corre LOCAL, la web es solo interfaz de visualización.
 
 ---
 
-## ARQUITECTURA DE DATOS
+## ARQUITECTURA
 
-### Tablas Supabase (crear en `supabase/migrations/002_core_tables.sql`)
+```
+LOCAL (Node.js CLI / Scripts)
+├── Importador de extractos (CSV/JSON)
+├── Parser de recordatorios
+├── Sincronización con Supabase
+└── Lógica de negocio
+
+WEB (Next.js - Solo UI)
+├── Visualización de tareas/reminders
+├── Filtros y búsqueda
+├── Edición inline
+└── Sin lógica de negocio pesada
+```
+
+---
+
+## MODELO DE DATOS UNIFICADO
 
 ```sql
--- 1. Estado de Ralph
-CREATE TABLE ralph_status (
+-- Tabla unificada tasks_reminders
+CREATE TABLE IF NOT EXISTS tasks_reminders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL,
-  status TEXT NOT NULL CHECK (status IN ('running', 'idle', 'stopped')),
-  current_building TEXT NOT NULL CHECK (current_building IN ('hq', 'taller', 'banco', 'biblioteca', 'torre')),
-  last_action TEXT,
-  energy INT DEFAULT 0,
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-CREATE INDEX idx_ralph_status_user ON ralph_status(user_id);
-CREATE INDEX idx_ralph_status_updated ON ralph_status(updated_at);
 
--- 2. Tareas
-CREATE TABLE tasks (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL,
+  -- Contenido
   title TEXT NOT NULL,
-  building TEXT NOT NULL,
-  status TEXT NOT NULL CHECK (status IN ('pending', 'in_progress', 'completed')),
+  description TEXT,
+
+  -- Tipo y estado
+  type TEXT NOT NULL CHECK (type IN ('task', 'reminder')),
+  status TEXT NOT NULL CHECK (status IN ('pending', 'in_progress', 'completed', 'cancelled')),
+  priority TEXT DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
+
+  -- Fechas
+  due_date TIMESTAMPTZ,
   completed_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-CREATE INDEX idx_tasks_user_status ON tasks(user_id, status);
-CREATE INDEX idx_tasks_completed ON tasks(user_id, completed_at);
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
 
--- 3. Finanzas
-CREATE TABLE finances (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL,
-  total NUMERIC NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-CREATE INDEX idx_finances_user_date ON finances(user_id, created_at DESC);
+  -- Recurrencia (para reminders)
+  recurring BOOLEAN DEFAULT false,
+  recurrence_rule TEXT, -- 'daily', 'weekly', 'monthly', etc.
 
--- 4. Ideas
-CREATE TABLE ideas (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL,
-  title TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-CREATE INDEX idx_ideas_user ON ideas(user_id, created_at);
+  -- Origen
+  source TEXT DEFAULT 'manual', -- 'manual', 'import', 'telegram'
+  source_file TEXT, -- nombre del archivo si fue importado
 
--- 5. Recordatorios
-CREATE TABLE reminders (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL,
-  title TEXT NOT NULL,
-  status TEXT NOT NULL CHECK (status IN ('active', 'done')),
-  created_at TIMESTAMPTZ DEFAULT now()
+  -- Tags
+  tags TEXT[] DEFAULT '{}'
 );
-CREATE INDEX idx_reminders_user_status ON reminders(user_id, status);
+
+CREATE INDEX idx_tasks_reminders_user ON tasks_reminders(user_id);
+CREATE INDEX idx_tasks_reminders_status ON tasks_reminders(user_id, status);
+CREATE INDEX idx_tasks_reminders_due ON tasks_reminders(user_id, due_date);
+CREATE INDEX idx_tasks_reminders_type ON tasks_reminders(user_id, type);
 ```
 
 ---
 
-## LAYOUT DEL WORLD
+## COMPONENTES A CREAR
 
-### Grid 2D (5 edificios + Ralph)
+### 1. CLI Local - Importador (`scripts/import-tasks.mjs`)
 
-```
-        [Biblioteca]
-            (top)
-              |
-  [Taller] - [HQ] - [Banco]
-   (left)  (center)  (right)
-              |
-          [Torre]
-          (bottom)
+```javascript
+// Uso: node scripts/import-tasks.mjs <archivo.csv>
+// Soporta: CSV, JSON, TXT (un item por línea)
+// Auto-detecta formato
+// Pregunta confirmación antes de importar
+// Sincroniza con Supabase
 ```
 
-### Edificios y sus datos
+**Formatos soportados:**
+- CSV: `title,description,due_date,priority,type`
+- JSON: `[{title, description, due_date, priority, type}]`
+- TXT: Una tarea por línea (se importa como task pending)
 
-| Edificio | Posición | Dato real | Ruta destino |
-|----------|----------|-----------|--------------|
-| HQ | Centro | Dashboard stats | `/dashboard` |
-| Taller | Izquierda | `COUNT(tasks WHERE status='pending')` | `/tasks` |
-| Banco | Derecha | `finances.total` (último registro) | `/finance` |
-| Biblioteca | Arriba | `COUNT(ideas)` | `/ideas` |
-| Torre | Abajo | `COUNT(reminders WHERE status='active')` | `/reminders` |
+### 2. CLI Local - Sync (`scripts/sync-tasks.mjs`)
 
-### Panel derecho (stats reales)
-
-- **Estado Ralph:** `ralph_status.status` (running/idle/stopped)
-- **Última acción:** `ralph_status.last_action`
-- **Tareas pendientes:** COUNT real
-- **Última actividad:** `ralph_status.updated_at`
-- **Energía:** `ralph_status.energy`
-- **Coins:** `COUNT(tasks WHERE completed_at >= TODAY)`
-
-### Colores por estado REAL
-
-- Verde = `status='running'`
-- Amarillo = `status='idle'`
-- Gris = `status='stopped'`
-
----
-
-## MOVIMIENTO DE RALPH
-
-Ralph NO deambula. Su posición se deriva ÚNICAMENTE de `ralph_status.current_building`.
-
-**Coordenadas por edificio:**
-```typescript
-const BUILDING_COORDS = {
-  hq: { x: 2, y: 2 },        // centro
-  taller: { x: 0, y: 2 },    // izquierda
-  banco: { x: 4, y: 2 },     // derecha
-  biblioteca: { x: 2, y: 0 }, // arriba
-  torre: { x: 2, y: 4 }      // abajo
-};
+```javascript
+// Sincroniza local <-> Supabase
+// Puede correr como cron job
+// Maneja conflictos (último gana)
 ```
 
-**Animación:** Solo cuando `current_building` cambia entre fetches. Si es complejo, teleport es válido.
+### 3. Web UI - Lista Unificada (`/tasks`)
 
-**Indicadores:**
-- `running` → icono gear pequeño
-- `stopped` → Zzz + tema gris
+- Vista lista con filtros: tipo, estado, prioridad, fecha
+- Tabs: Todas | Tareas | Recordatorios | Completadas
+- Edición inline (click para editar)
+- Drag & drop para cambiar prioridad
+- Bulk actions: completar, eliminar, cambiar prioridad
 
----
+### 4. Web UI - Vista Calendario (`/tasks/calendar`)
 
-## ARCHIVOS A MODIFICAR
-
-### 1. REESCRIBIR COMPLETAMENTE
-```
-apps/web/src/app/world/page.tsx
-```
-- Eliminar imports isométricos
-- Server component con fetch a Supabase
-- Grid CSS 2D con estética pixel/retro
-- Renderizar edificios con contadores reales
-- Renderizar Ralph en coordenadas de `current_building`
-- Panel derecho con stats reales
-- Loading/empty states robustos
-
-### 2. VERIFICAR/ADAPTAR
-```
-apps/web/src/app/api/ralph/route.ts
-```
-- Debe leer de Supabase (no datos mock)
-
-### 3. CREAR SI NO EXISTE
-```
-apps/web/src/app/api/world/summary/route.ts
-```
-```typescript
-// GET /api/world/summary
-// Returns: { ralph_status, counts, latest_finance, last_log }
-```
+- Calendario mensual con tareas/reminders
+- Click en día para ver/crear
+- Colores por tipo y prioridad
 
 ---
 
 ## PASOS DE IMPLEMENTACIÓN
 
-1. **Inspeccionar** código existente de World, identificar y eliminar código isométrico
-2. **Crear migración** `002_core_tables.sql` con las tablas definidas
-3. **Implementar data layer** para World summary (queries reales)
-4. **Reconstruir** `page.tsx`:
-   - Layout: grid izquierda + panel derecho
-   - Edificios clicables con contadores
-   - Ralph sprite posicionado por `current_building`
-   - Estados visuales por `status`
-5. **Manejar edge cases**:
-   - Sin `ralph_status` → "Ralph no inicializado"
-   - Tablas vacías → mostrar ceros (datos reales = 0)
-   - Usuario no autenticado → redirect a login
-6. **Verificar** typecheck, lint, build
-7. **Deploy** a Vercel
-
----
-
-## DATOS DE PRUEBA (para seed)
-
-```sql
--- Insertar estado inicial de Ralph
-INSERT INTO ralph_status (user_id, status, current_building, last_action, energy)
-VALUES ('TU_USER_ID', 'idle', 'hq', 'Esperando instrucciones', 50);
-
--- Insertar algunas tareas
-INSERT INTO tasks (user_id, title, building, status) VALUES
-('TU_USER_ID', 'Revisar código', 'taller', 'pending'),
-('TU_USER_ID', 'Actualizar docs', 'taller', 'pending'),
-('TU_USER_ID', 'Deploy v2', 'taller', 'completed');
-
--- Insertar balance
-INSERT INTO finances (user_id, total) VALUES ('TU_USER_ID', 15000.00);
-
--- Insertar ideas
-INSERT INTO ideas (user_id, title) VALUES
-('TU_USER_ID', 'Nueva feature X'),
-('TU_USER_ID', 'Optimizar queries');
-
--- Insertar reminders
-INSERT INTO reminders (user_id, title, status) VALUES
-('TU_USER_ID', 'Llamar a cliente', 'active'),
-('TU_USER_ID', 'Revisar facturas', 'active');
-```
-
----
-
-## CRITERIOS DE ÉXITO
-
-- [ ] `/world` muestra grid 2D con 5 edificios y Ralph
-- [ ] Posición de Ralph = `ralph_status.current_building` (real)
-- [ ] Contadores = queries reales a Supabase
-- [ ] Panel derecho = datos reales
-- [ ] Sin `Math.random()`, sin datos fake, sin animaciones simuladas
-- [ ] Build exitoso en Vercel
+1. **Crear migración SQL** para tabla unificada
+2. **Crear script importador** `scripts/import-tasks.mjs`
+3. **Crear script sync** `scripts/sync-tasks.mjs`
+4. **Actualizar/crear página** `/tasks` con UI unificada
+5. **API routes** para CRUD
+6. **Probar importación** con archivo de ejemplo
+7. **Verificar build** y deploy
 
 ---
 
@@ -239,12 +132,10 @@ INSERT INTO reminders (user_id, title, status) VALUES
 1. Después de crear/modificar un archivo importante → commit + push
 2. Después de completar un paso de implementación → commit + push
 3. Después de arreglar un bug o error → commit + push
-4. Máximo 2-3 archivos por commit (commits pequeños y frecuentes)
 
-**Formato de commits:**
 ```bash
 git add <archivos_específicos>
-git commit -m "feat|fix|docs: descripción corta"
+git commit -m "feat|fix: descripción corta"
 git push origin main
 ```
 
@@ -252,11 +143,38 @@ git push origin main
 
 ---
 
-## OUTPUT ESPERADO
+## EJEMPLO DE IMPORTACIÓN
 
-Al finalizar, reportar:
-1. Lista de archivos modificados/creados
-2. Contenido de la migración SQL
-3. Nuevos endpoints API (si los hay)
-4. Comandos para verificar localmente
-5. Comportamiento esperado en UI
+Archivo `mis-tareas.csv`:
+```csv
+title,description,due_date,priority,type
+Llamar a Roger,Confirmar fecha del show,2026-01-25,high,task
+Revisar contrato BABEL,Pendiente firma,2026-01-24,urgent,task
+Pagar factura Vercel,Mensual,2026-01-30,medium,reminder
+Reunión A2G Talents,Semanal con equipo,2026-01-27,medium,reminder
+```
+
+Comando:
+```bash
+node scripts/import-tasks.mjs mis-tareas.csv
+```
+
+---
+
+## CRITERIOS DE ÉXITO
+
+- [ ] Tabla `tasks_reminders` creada en Supabase
+- [ ] Script importador funciona con CSV/JSON/TXT
+- [ ] Script sync funciona bidireccional
+- [ ] UI `/tasks` muestra lista unificada con filtros
+- [ ] Edición inline funciona
+- [ ] Build exitoso en Vercel
+
+---
+
+## NOTAS
+
+- NO tocar el World por ahora
+- Priorizar funcionalidad sobre estética
+- La lógica pesada va en scripts locales, NO en la web
+- Usar las credenciales de Supabase existentes en el proyecto
