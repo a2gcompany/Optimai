@@ -63,16 +63,18 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Upsert terminal
-    const terminal = await upsertTerminal(pueblo.id, payload);
-    if (!terminal) {
+    const result = await upsertTerminal(pueblo.id, payload);
+    if (!result) {
       return NextResponse.json(
         { error: 'Failed to update terminal' },
         { status: 500 }
       );
     }
 
-    // 3. Log activity if status changed significantly
-    if (payload.current_task) {
+    const { terminal, previousTask } = result;
+
+    // 3. Log activity only when task actually changes (not on every heartbeat)
+    if (payload.current_task && payload.current_task !== previousTask) {
       await logActivity(terminal.id, pueblo.id, 'task_start', payload.current_task);
     }
 
@@ -153,7 +155,21 @@ async function createPueblo(ownerName: string): Promise<Pueblo | null> {
   return data;
 }
 
-async function upsertTerminal(puebloId: string, payload: HeartbeatPayload): Promise<Terminal | null> {
+interface TerminalWithTask extends Terminal {
+  current_task: string | null;
+}
+
+async function upsertTerminal(puebloId: string, payload: HeartbeatPayload): Promise<{ terminal: Terminal; previousTask: string | null } | null> {
+  // First, get the current terminal state to check if task changed
+  const { data: existing } = await supabase
+    .from('terminals')
+    .select('id, pueblo_id, session_id, current_task')
+    .eq('pueblo_id', puebloId)
+    .eq('session_id', payload.session_id)
+    .single();
+
+  const previousTask = (existing as TerminalWithTask | null)?.current_task || null;
+
   const { data, error } = await supabase
     .from('terminals')
     .upsert(
@@ -184,7 +200,7 @@ async function upsertTerminal(puebloId: string, payload: HeartbeatPayload): Prom
     console.error('Error upserting terminal:', error);
     return null;
   }
-  return data;
+  return { terminal: data, previousTask };
 }
 
 async function logActivity(

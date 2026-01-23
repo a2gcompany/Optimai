@@ -63,8 +63,12 @@ interface WorldState {
 
 export async function GET() {
   try {
-    // First, mark stale terminals as offline (no heartbeat in 60s)
-    await markStaleTerminalsOffline();
+    // Cleanup: mark stale terminals offline, delete old ones, prune activity
+    await Promise.all([
+      markStaleTerminalsOffline(),
+      cleanupOldTerminals(),
+      cleanupOldActivity(),
+    ]);
 
     // Fetch all data in parallel
     const [pueblosResult, terminalsResult, statsResult, activityResult] = await Promise.all([
@@ -179,6 +183,8 @@ export async function GET() {
 
 // Terminals are considered active if heartbeat within last 60 seconds
 const HEARTBEAT_TIMEOUT_MS = 60 * 1000;
+// Delete offline terminals after 1 hour of inactivity
+const CLEANUP_THRESHOLD_MS = 60 * 60 * 1000;
 
 function isRecent(timestamp: string): boolean {
   const cutoff = Date.now() - HEARTBEAT_TIMEOUT_MS;
@@ -193,6 +199,27 @@ async function markStaleTerminalsOffline(): Promise<void> {
     .update({ status: 'offline', updated_at: new Date().toISOString() })
     .neq('status', 'offline')
     .lt('last_heartbeat', cutoff);
+}
+
+// Delete terminals that have been offline for more than 1 hour
+async function cleanupOldTerminals(): Promise<void> {
+  const cutoff = new Date(Date.now() - CLEANUP_THRESHOLD_MS).toISOString();
+
+  await supabase
+    .from('terminals')
+    .delete()
+    .eq('status', 'offline')
+    .lt('last_heartbeat', cutoff);
+}
+
+// Delete old activity entries (keep last 100 or last 24 hours)
+async function cleanupOldActivity(): Promise<void> {
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+  await supabase
+    .from('terminal_activity')
+    .delete()
+    .lt('created_at', oneDayAgo);
 }
 
 function getDefaultPueblos(): Pueblo[] {
