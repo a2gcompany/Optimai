@@ -1,42 +1,51 @@
 import { getSupabaseClient } from '../client';
 
-// Using dev_tasks table from Nucleus which already exists
+// Using tasks_reminders table (unified tasks + reminders)
 export interface Task {
   id: string;
+  user_id: string;
   title: string;
   description: string | null;
+  type: 'task' | 'reminder';
   status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-  priority: 'low' | 'medium' | 'high';
-  notes: string | null;
-  blockers: string | null;
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  due_date: string | null;
+  completed_at: string | null;
   created_at: string;
   updated_at: string;
-  completed_at: string | null;
-  // Extended fields
-  user_id?: string;
-  due_date?: string;
-  tags?: string[];
+  recurring: boolean;
+  recurrence_rule: string | null;
+  source: 'manual' | 'import' | 'telegram';
+  source_file: string | null;
+  tags: string[];
 }
 
 export interface TaskInsert {
-  user_id?: string;
+  user_id: string;
   title: string;
   description?: string;
+  type?: 'task' | 'reminder';
   status?: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-  priority?: 'low' | 'medium' | 'high';
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
   due_date?: string;
   tags?: string[];
+  recurring?: boolean;
+  recurrence_rule?: string;
+  source?: 'manual' | 'import' | 'telegram';
+  source_file?: string;
 }
 
-export type TaskUpdate = Partial<TaskInsert> & { completed_at?: string };
+export type TaskUpdate = Partial<Omit<TaskInsert, 'user_id'>> & { completed_at?: string };
 
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
-export type TaskPriority = 'low' | 'medium' | 'high';
+export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
+
+const TABLE = 'tasks_reminders';
 
 export async function getTaskById(id: string): Promise<Task | null> {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
-    .from('dev_tasks')
+    .from(TABLE)
     .select('*')
     .eq('id', id)
     .single();
@@ -55,12 +64,15 @@ export async function getTasksByUser(
   options?: {
     status?: TaskStatus;
     priority?: TaskPriority;
+    type?: 'task' | 'reminder';
     limit?: number;
   }
 ): Promise<Task[]> {
   const supabase = getSupabaseClient();
-  // dev_tasks doesn't have user_id, so we return all tasks
-  let query = supabase.from('dev_tasks').select('*');
+  let query = supabase
+    .from(TABLE)
+    .select('*')
+    .eq('user_id', userId); // Now properly filters by user
 
   if (options?.status) {
     query = query.eq('status', options.status);
@@ -68,6 +80,10 @@ export async function getTasksByUser(
 
   if (options?.priority) {
     query = query.eq('priority', options.priority);
+  }
+
+  if (options?.type) {
+    query = query.eq('type', options.type);
   }
 
   query = query.order('created_at', { ascending: false });
@@ -88,54 +104,47 @@ export async function getTasksByUser(
 export async function createTask(task: TaskInsert): Promise<Task> {
   const supabase = getSupabaseClient();
 
-  // Map to dev_tasks schema
-  const devTask = {
+  const newTask = {
+    user_id: task.user_id,
     title: task.title,
     description: task.description || null,
+    type: task.type || 'task',
     status: task.status || 'pending',
     priority: task.priority || 'medium',
-    notes: null,
-    blockers: null,
+    due_date: task.due_date || null,
+    tags: task.tags || [],
+    recurring: task.recurring || false,
+    recurrence_rule: task.recurrence_rule || null,
+    source: task.source || 'manual',
+    source_file: task.source_file || null,
   };
 
   const { data, error } = await supabase
-    .from('dev_tasks')
-    .insert(devTask as never)
+    .from(TABLE)
+    .insert(newTask)
     .select()
     .single();
 
   if (error) throw error;
 
-  return {
-    ...(data as Task),
-    user_id: task.user_id,
-    due_date: task.due_date,
-    tags: task.tags || [],
-  };
+  return data;
 }
 
 export async function updateTask(id: string, updates: TaskUpdate): Promise<Task> {
   const supabase = getSupabaseClient();
 
-  const devUpdates: Record<string, unknown> = {
-    updated_at: new Date().toISOString(),
-  };
-
-  if (updates.title) devUpdates.title = updates.title;
-  if (updates.description !== undefined) devUpdates.description = updates.description;
-  if (updates.status) devUpdates.status = updates.status;
-  if (updates.priority) devUpdates.priority = updates.priority;
-  if (updates.completed_at) devUpdates.completed_at = updates.completed_at;
-
   const { data, error } = await supabase
-    .from('dev_tasks')
-    .update(devUpdates as never)
+    .from(TABLE)
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString(),
+    })
     .eq('id', id)
     .select()
     .single();
 
   if (error) throw error;
-  return data as Task;
+  return data;
 }
 
 export async function completeTask(id: string): Promise<Task> {
@@ -147,7 +156,7 @@ export async function completeTask(id: string): Promise<Task> {
 
 export async function deleteTask(id: string): Promise<void> {
   const supabase = getSupabaseClient();
-  const { error } = await supabase.from('dev_tasks').delete().eq('id', id);
+  const { error } = await supabase.from(TABLE).delete().eq('id', id);
 
   if (error) throw error;
 }
@@ -156,14 +165,18 @@ export async function getPendingTasksDueSoon(
   userId: string,
   hoursAhead: number = 24
 ): Promise<Task[]> {
-  // dev_tasks doesn't have due_date, return pending tasks
   const supabase = getSupabaseClient();
+  const futureDate = new Date(Date.now() + hoursAhead * 60 * 60 * 1000).toISOString();
+
   const { data, error } = await supabase
-    .from('dev_tasks')
+    .from(TABLE)
     .select('*')
+    .eq('user_id', userId)
     .eq('status', 'pending')
-    .order('priority', { ascending: false })
-    .limit(10);
+    .not('due_date', 'is', null)
+    .lte('due_date', futureDate)
+    .order('due_date', { ascending: true })
+    .limit(20);
 
   if (error) {
     console.error('getPendingTasksDueSoon error:', error);
@@ -173,14 +186,29 @@ export async function getPendingTasksDueSoon(
 }
 
 export async function getOverdueTasks(userId: string): Promise<Task[]> {
-  // dev_tasks doesn't have due_date, return empty
-  return [];
+  const supabase = getSupabaseClient();
+  const now = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select('*')
+    .eq('user_id', userId)
+    .eq('status', 'pending')
+    .not('due_date', 'is', null)
+    .lt('due_date', now)
+    .order('due_date', { ascending: true });
+
+  if (error) {
+    console.error('getOverdueTasks error:', error);
+    return [];
+  }
+  return data || [];
 }
 
 export async function getAllTasks(limit = 50): Promise<Task[]> {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
-    .from('dev_tasks')
+    .from(TABLE)
     .select('*')
     .order('created_at', { ascending: false })
     .limit(limit);
@@ -192,10 +220,20 @@ export async function getAllTasks(limit = 50): Promise<Task[]> {
   return data || [];
 }
 
+// Get only tasks (not reminders)
+export async function getOnlyTasks(userId: string, limit = 50): Promise<Task[]> {
+  return getTasksByUser(userId, { type: 'task', limit });
+}
+
+// Get only reminders (not tasks)
+export async function getOnlyReminders(userId: string, limit = 50): Promise<Task[]> {
+  return getTasksByUser(userId, { type: 'reminder', limit });
+}
+
 // Class-based repository for compatibility
 export const TasksRepository = {
   findById: getTaskById,
-  findByUserId: (userId: string) => getTasksByUser(userId),
+  findByUserId: getTasksByUser,
   create: createTask,
   update: updateTask,
   complete: completeTask,
@@ -203,4 +241,6 @@ export const TasksRepository = {
   getPendingDueSoon: getPendingTasksDueSoon,
   getOverdue: getOverdueTasks,
   getAll: getAllTasks,
+  getTasks: getOnlyTasks,
+  getReminders: getOnlyReminders,
 };
