@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { RemindersRepository, UsersRepository, User } from '@optimai/db';
+import { RemindersRepository, UsersRepository } from '@optimai/db';
 import { sendMessage } from '@/lib/telegram';
-import type { Reminder } from '@optimai/types';
+import type { Reminder, User } from '@optimai/types';
 
 // Cron secret for Vercel Cron Jobs
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -140,7 +140,7 @@ async function processDailySummaries(now: Date): Promise<void> {
   // Get users with daily summaries enabled
   const users = await UsersRepository.findAll();
   const eligibleUsers = users.filter(
-    (u: User) => u.is_active && (u as Record<string, unknown>).preferences?.daily_summary_time
+    (u: User) => u.is_active && u.preferences?.daily_summary_time
   );
 
   for (const user of eligibleUsers) {
