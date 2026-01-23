@@ -1,12 +1,33 @@
 {
-    "project": "Optimai",
-    "created_at": "2026-01-22T22:57:22+08:00",
-    "total_time_seconds": 0,
-    "total_loops": 0,
-    "total_tasks_completed": 0,
-    "total_api_calls": 0,
-    "total_input_tokens": 0,
-    "total_output_tokens": 0,
-    "estimated_cost_usd": 0.0,
-    "sessions": []
+  "project": "Optimai",
+  "created_at": "2026-01-22T22:57:22+08:00",
+  "total_time_seconds": 1,
+  "total_loops": 2,
+  "total_tasks_completed": 34,
+  "total_api_calls": 0,
+  "total_input_tokens": 0,
+  "total_output_tokens": 0,
+  "estimated_cost_usd": 0,
+  "sessions": [
+    {
+      "start": "2026-01-22T23:28:54+08:00",
+      "end": "2026-01-22T23:28:55+08:00",
+      "duration_seconds": 1,
+      "loops": 1,
+      "tasks": 17,
+      "api_calls": 0,
+      "tokens_in": 0,
+      "tokens_out": 0
+    },
+    {
+      "start": "2026-01-22T23:29:32+08:00",
+      "end": "2026-01-22T23:29:32+08:00",
+      "duration_seconds": 0,
+      "loops": 1,
+      "tasks": 17,
+      "api_calls": 0,
+      "tokens_in": 0,
+      "tokens_out": 0
+    }
+  ]
 }

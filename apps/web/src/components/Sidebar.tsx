@@ -18,7 +18,6 @@ const navigation = [
   { name: 'World', href: '/world', icon: Globe },
   { name: 'Tareas', href: '/tasks', icon: CheckSquare },
   { name: 'Finanzas', href: '/finance', icon: Wallet },
-  { name: 'Recordatorios', href: '/reminders', icon: Bell },
   { name: 'Ideas', href: '/ideas', icon: Lightbulb },
   { name: 'Configuración', href: '/settings', icon: Settings },
 ];

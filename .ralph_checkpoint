@@ -1,11 +1,11 @@
 {
-    "operation": "main_started",
-    "timestamp": "2026-01-22T15:23:23+00:00",
-    "epoch": 1769095403,
-    "loop_count": 0,
-    "call_count": 19,
+    "operation": "interrupted",
+    "timestamp": "2026-01-23T04:07:34+00:00",
+    "epoch": 1769141254,
+    "loop_count": 18,
+    "call_count": 5,
     "circuit_state": "CLOSED",
     "session_id": "",
-    "pid": 57183,
-    "data": {}
+    "pid": 76283,
+    "data": {"reason": "user_interrupt"}
 }
