@@ -201,6 +201,99 @@ function PuebloCard({ pueblo, expanded, onToggle }: { pueblo: Pueblo; expanded: 
   );
 }
 
+// Timeline visual del día - muestra actividad por horas
+function DailyTimeline({ activity }: { activity: Activity[] }) {
+  // Agrupa actividad por hora
+  const hourlyActivity = new Map<number, Activity[]>();
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  activity.forEach((item) => {
+    const date = new Date(item.created_at);
+    if (date >= todayStart) {
+      const hour = date.getHours();
+      if (!hourlyActivity.has(hour)) {
+        hourlyActivity.set(hour, []);
+      }
+      hourlyActivity.get(hour)!.push(item);
+    }
+  });
+
+  const currentHour = now.getHours();
+
+  return (
+    <div className="space-y-2">
+      {/* Timeline visual */}
+      <div className="flex gap-0.5">
+        {Array.from({ length: 24 }, (_, hour) => {
+          const hasActivity = hourlyActivity.has(hour);
+          const activityCount = hourlyActivity.get(hour)?.length || 0;
+          const isCurrent = hour === currentHour;
+          const isPast = hour < currentHour;
+
+          return (
+            <div
+              key={hour}
+              className={`
+                flex-1 h-6 rounded-sm relative group cursor-pointer
+                ${hasActivity
+                  ? 'bg-green-500'
+                  : isPast
+                    ? 'bg-slate-700'
+                    : 'bg-slate-800'
+                }
+                ${isCurrent ? 'ring-2 ring-white/50' : ''}
+              `}
+              style={{
+                opacity: hasActivity ? Math.min(0.4 + activityCount * 0.2, 1) : 1,
+              }}
+              title={`${hour}:00 - ${activityCount} eventos`}
+            >
+              {/* Tooltip on hover */}
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-10">
+                <div className="bg-slate-900 text-white text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap">
+                  {hour}:00 {hasActivity ? `(${activityCount})` : ''}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Leyenda de horas */}
+      <div className="flex justify-between text-[10px] text-slate-600 px-0.5">
+        <span>0h</span>
+        <span>6h</span>
+        <span>12h</span>
+        <span>18h</span>
+        <span>24h</span>
+      </div>
+
+      {/* Actividad reciente (últimos 5) */}
+      {activity.length > 0 && (
+        <div className="mt-3 space-y-1">
+          <div className="text-[10px] text-slate-500 uppercase tracking-wider">Último cambio</div>
+          {activity.slice(0, 3).map((item) => (
+            <div
+              key={item.id}
+              className="text-xs text-slate-400 truncate"
+            >
+              <span className="text-slate-600">
+                {new Date(item.created_at).toLocaleTimeString('es-ES', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </span>
+              {' '}
+              {item.description}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ActivityFeed({ activity }: { activity: Activity[] }) {
   if (activity.length === 0) {
     return (
@@ -380,12 +473,12 @@ export default function WorldPage() {
                 </div>
               </div>
 
-              {/* Activity feed */}
+              {/* Daily Timeline */}
               <div className="bg-slate-800/50 rounded-xl border-2 border-slate-700 p-4">
                 <h3 className="font-bold mb-3 flex items-center gap-2">
-                  📋 Actividad reciente
+                  📊 Actividad del día
                 </h3>
-                <ActivityFeed activity={data?.activity || []} />
+                <DailyTimeline activity={data?.activity || []} />
               </div>
 
               {/* Last update */}
