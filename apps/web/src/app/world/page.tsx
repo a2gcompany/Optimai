@@ -260,7 +260,7 @@ export default function WorldPage() {
     }
 
     fetchData();
-    const interval = setInterval(fetchData, 5000); // Refresh every 5s
+    const interval = setInterval(fetchData, 3000); // Refresh every 3s for real-time feel
     return () => clearInterval(interval);
   }, []);
 
@@ -403,7 +403,7 @@ export default function WorldPage() {
       {/* Footer */}
       <footer className="border-t border-slate-800 py-4 mt-8">
         <div className="max-w-6xl mx-auto px-4 text-center text-xs text-slate-600">
-          Optimai World • Multi-user terminal monitoring • Refresh cada 5s
+          Optimai World • Multi-user terminal monitoring • Refresh cada 3s
         </div>
       </footer>
     </div>

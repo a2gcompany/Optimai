@@ -178,18 +178,18 @@ export async function GET() {
 // -----------------------------------------------------------------------------
 
 function isRecent(timestamp: string): boolean {
-  const twoMinutesAgo = Date.now() - 2 * 60 * 1000;
-  return new Date(timestamp).getTime() > twoMinutesAgo;
+  const fifteenSecondsAgo = Date.now() - 15 * 1000;
+  return new Date(timestamp).getTime() > fifteenSecondsAgo;
 }
 
 async function markStaleTerminalsOffline(): Promise<void> {
-  const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+  const fifteenSecondsAgo = new Date(Date.now() - 15 * 1000).toISOString();
 
   await supabase
     .from('terminals')
     .update({ status: 'offline', updated_at: new Date().toISOString() })
     .neq('status', 'offline')
-    .lt('last_heartbeat', twoMinutesAgo);
+    .lt('last_heartbeat', fifteenSecondsAgo);
 }
 
 function getDefaultPueblos(): Pueblo[] {
