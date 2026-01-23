@@ -164,62 +164,80 @@ async function executeAction(
 export async function processMessage(input: BrainInput): Promise<BrainOutput> {
   const { userId, chatId, message, userName } = input;
 
-  // Load user and conversation history
-  const user = await UsersRepository.findById(userId);
-  const conversations = await ConversationsRepository.findByUserId(userId);
-  const latestConversation = conversations[0];
+  try {
+    // Load user and conversation history
+    const user = await UsersRepository.findById(userId);
+    const conversations = await ConversationsRepository.findByUserId(userId);
+    const latestConversation = conversations[0];
 
-  // Build message history
-  const messages: Message[] = [];
+    // Build message history
+    const messages: Message[] = [];
 
-  // Add system prompt with context
-  const systemPrompt = createContextualPrompt(OPTIMAI_SYSTEM_PROMPT, {
-    userName: userName || user?.first_name,
-    timezone: user?.preferences?.timezone || 'America/Mexico_City',
-    language: user?.preferences?.language || 'es',
-  });
-  messages.push({ role: 'system', content: systemPrompt });
+    // Add system prompt with context
+    const systemPrompt = createContextualPrompt(OPTIMAI_SYSTEM_PROMPT, {
+      userName: userName || user?.first_name,
+      timezone: user?.preferences?.timezone || 'America/Mexico_City',
+      language: user?.preferences?.language || 'es',
+    });
+    messages.push({ role: 'system', content: systemPrompt });
 
-  // Add conversation history (last 10 messages)
-  if (latestConversation?.messages) {
-    const recentMessages = latestConversation.messages.slice(-10);
-    for (const msg of recentMessages) {
-      messages.push({
-        role: msg.role === 'user' ? 'user' : 'assistant',
-        content: msg.content,
-      });
+    // Add conversation history (last 10 messages)
+    if (latestConversation?.messages) {
+      const recentMessages = latestConversation.messages.slice(-10);
+      for (const msg of recentMessages) {
+        messages.push({
+          role: msg.role === 'user' ? 'user' : 'assistant',
+          content: msg.content,
+        });
+      }
     }
-  }
 
-  // Add current message
-  messages.push({ role: 'user', content: message });
+    // Add current message
+    messages.push({ role: 'user', content: message });
 
-  // Call AI with function calling
-  const completion = await createCompletionWithFunctions(messages, OPTIMAI_FUNCTIONS, {
-    model: 'gpt-4o-mini',
-    temperature: 0.7,
-  });
+    // Call AI with function calling
+    const completion = await createCompletionWithFunctions(messages, OPTIMAI_FUNCTIONS, {
+      model: 'gpt-4o-mini',
+      temperature: 0.7,
+    });
 
-  let response = completion.content || '';
-  let action: BrainAction | null = null;
-  let actionResult: unknown;
+    let response = completion.content || '';
+    let action: BrainAction | null = null;
+    let actionResult: unknown;
 
-  // Execute function if called
-  if (completion.functionCall) {
-    const executed = await executeAction(completion.functionCall, userId, chatId);
-    action = executed.action;
-    actionResult = executed.result;
+    // Execute function if called
+    if (completion.functionCall) {
+      try {
+        const executed = await executeAction(completion.functionCall, userId, chatId);
+        action = executed.action;
+        actionResult = executed.result;
 
-    // If no text response, generate one based on action result
-    if (!response && action.type !== 'none') {
-      response = generateActionResponse(action, actionResult);
+        // If no text response, generate one based on action result
+        if (!response && action.type !== 'none') {
+          response = generateActionResponse(action, actionResult);
+        }
+      } catch (functionError) {
+        console.error('Function execution failed:', functionError);
+        response = 'Lo siento, hubo un error al ejecutar la acción. Por favor, intenta de nuevo.';
+        action = { type: 'none' };
+        actionResult = { error: String(functionError) };
+      }
     }
+
+    // Update conversation history
+    await updateConversation(userId, chatId, message, response);
+
+    return { response, action, actionResult };
+  } catch (error) {
+    console.error('Brain processing error:', error);
+
+    // Return a graceful error response
+    return {
+      response: 'Lo siento, estoy teniendo problemas para procesar tu mensaje. Por favor, intenta de nuevo.',
+      action: null,
+      actionResult: { error: String(error) },
+    };
   }
-
-  // Update conversation history
-  await updateConversation(userId, chatId, message, response);
-
-  return { response, action, actionResult };
 }
 
 // -----------------------------------------------------------------------------
