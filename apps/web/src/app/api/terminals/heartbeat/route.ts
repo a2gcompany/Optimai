@@ -160,7 +160,22 @@ interface TerminalWithTask extends Terminal {
 }
 
 async function upsertTerminal(puebloId: string, payload: HeartbeatPayload): Promise<{ terminal: Terminal; previousTask: string | null } | null> {
-  // First, get the current terminal state to check if task changed
+  const terminalData = {
+    name: payload.name || `${payload.client_type} session`,
+    client_type: payload.client_type,
+    status: payload.status || 'active',
+    current_task: payload.current_task || null,
+    current_file: payload.current_file || null,
+    speech_bubble: payload.speech_bubble || null,
+    tasks_completed: payload.tasks_completed || 0,
+    lines_written: payload.lines_written || 0,
+    energy: payload.energy ?? 100,
+    last_heartbeat: new Date().toISOString(),
+    metadata: payload.metadata || {},
+    updated_at: new Date().toISOString(),
+  };
+
+  // Check if terminal exists
   const { data: existing } = await supabase
     .from('terminals')
     .select('id, pueblo_id, session_id, current_task')
@@ -170,37 +185,39 @@ async function upsertTerminal(puebloId: string, payload: HeartbeatPayload): Prom
 
   const previousTask = (existing as TerminalWithTask | null)?.current_task || null;
 
-  const { data, error } = await supabase
-    .from('terminals')
-    .upsert(
-      {
+  let data: Terminal | null = null;
+  let error = null;
+
+  if (existing) {
+    // Update existing terminal
+    const result = await supabase
+      .from('terminals')
+      .update(terminalData)
+      .eq('id', existing.id)
+      .select('id, pueblo_id, session_id')
+      .single();
+    data = result.data;
+    error = result.error;
+  } else {
+    // Insert new terminal
+    const result = await supabase
+      .from('terminals')
+      .insert({
         pueblo_id: puebloId,
         session_id: payload.session_id,
-        name: payload.name || `${payload.client_type} session`,
-        client_type: payload.client_type,
-        status: payload.status || 'active',
-        current_task: payload.current_task || null,
-        current_file: payload.current_file || null,
-        speech_bubble: payload.speech_bubble || null,
-        tasks_completed: payload.tasks_completed || 0,
-        lines_written: payload.lines_written || 0,
-        energy: payload.energy ?? 100,
-        last_heartbeat: new Date().toISOString(),
-        metadata: payload.metadata || {},
-        updated_at: new Date().toISOString(),
-      },
-      {
-        onConflict: 'pueblo_id,session_id',
-      }
-    )
-    .select('id, pueblo_id, session_id')
-    .single();
+        ...terminalData,
+      })
+      .select('id, pueblo_id, session_id')
+      .single();
+    data = result.data;
+    error = result.error;
+  }
 
   if (error) {
     console.error('Error upserting terminal:', error);
     return null;
   }
-  return { terminal: data, previousTask };
+  return { terminal: data!, previousTask };
 }
 
 async function logActivity(

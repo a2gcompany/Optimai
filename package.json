@@ -11,7 +11,9 @@
     "dev": "turbo dev",
     "lint": "turbo lint",
     "test": "turbo test",
-    "clean": "turbo clean && rm -rf node_modules"
+    "clean": "turbo clean && rm -rf node_modules",
+    "cli": "pnpm -F @optimai/cli build && node apps/cli/dist/index.js",
+    "cli:dev": "pnpm -F @optimai/cli dev"
   },
   "devDependencies": {
     "pg": "^8.17.2",
