@@ -63,7 +63,7 @@ interface WorldState {
 
 export async function GET() {
   try {
-    // First, mark stale terminals as offline (no heartbeat in 2 min)
+    // First, mark stale terminals as offline (no heartbeat in 60s)
     await markStaleTerminalsOffline();
 
     // Fetch all data in parallel
@@ -177,19 +177,22 @@ export async function GET() {
 // Helpers
 // -----------------------------------------------------------------------------
 
+// Terminals are considered active if heartbeat within last 60 seconds
+const HEARTBEAT_TIMEOUT_MS = 60 * 1000;
+
 function isRecent(timestamp: string): boolean {
-  const fifteenSecondsAgo = Date.now() - 15 * 1000;
-  return new Date(timestamp).getTime() > fifteenSecondsAgo;
+  const cutoff = Date.now() - HEARTBEAT_TIMEOUT_MS;
+  return new Date(timestamp).getTime() > cutoff;
 }
 
 async function markStaleTerminalsOffline(): Promise<void> {
-  const fifteenSecondsAgo = new Date(Date.now() - 15 * 1000).toISOString();
+  const cutoff = new Date(Date.now() - HEARTBEAT_TIMEOUT_MS).toISOString();
 
   await supabase
     .from('terminals')
     .update({ status: 'offline', updated_at: new Date().toISOString() })
     .neq('status', 'offline')
-    .lt('last_heartbeat', fifteenSecondsAgo);
+    .lt('last_heartbeat', cutoff);
 }
 
 function getDefaultPueblos(): Pueblo[] {
