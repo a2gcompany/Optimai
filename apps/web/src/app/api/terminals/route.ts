@@ -76,8 +76,7 @@ export async function GET() {
 
       supabase
         .from('terminals')
-        .select('*')
-        .order('last_heartbeat', { ascending: false }),
+        .select('id, pueblo_id, name, client_type, session_id, status, current_task, current_file, speech_bubble, tasks_completed, energy, last_heartbeat'),
 
       supabase
         .from('pueblo_stats')
@@ -104,6 +103,7 @@ export async function GET() {
     const pueblos = pueblosResult.data || [];
     const terminals = terminalsResult.data || [];
     const stats = statsResult.data || [];
+
 
     // If no pueblos in DB, use defaults
     const finalPueblos = pueblos.length > 0 ? pueblos : getDefaultPueblos().map(p => ({
