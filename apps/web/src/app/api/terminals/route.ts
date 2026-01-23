@@ -183,8 +183,8 @@ export async function GET() {
 
 // Terminals are considered active if heartbeat within last 60 seconds
 const HEARTBEAT_TIMEOUT_MS = 60 * 1000;
-// Delete offline terminals after 1 hour of inactivity
-const CLEANUP_THRESHOLD_MS = 60 * 60 * 1000;
+// Delete offline terminals after 30 minutes of inactivity
+const CLEANUP_THRESHOLD_MS = 30 * 60 * 1000;
 
 function isRecent(timestamp: string): boolean {
   const cutoff = Date.now() - HEARTBEAT_TIMEOUT_MS;
