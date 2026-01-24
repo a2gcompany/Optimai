@@ -1,6 +1,9 @@
 import { getSupabaseClient } from '../client';
 
-const supabase = getSupabaseClient();
+// Use lazy initialization to avoid build errors
+function getClient() {
+  return getSupabaseClient();
+}
 
 // ============================================================================
 // TYPES
@@ -80,7 +83,7 @@ export interface PuebloMessage {
 export const pueblosRepository = {
   // Get all active pueblos
   async getAll(): Promise<Pueblo[]> {
-    const { data, error } = await supabase
+    const { data, error } = await getClient()
       .from('pueblos')
       .select('*')
       .eq('is_active', true)
@@ -95,7 +98,7 @@ export const pueblosRepository = {
 
   // Get pueblo by ID
   async getById(id: string): Promise<Pueblo | null> {
-    const { data, error } = await supabase
+    const { data, error } = await getClient()
       .from('pueblos')
       .select('*')
       .eq('id', id)
@@ -110,7 +113,7 @@ export const pueblosRepository = {
 
   // Get pueblo by owner name
   async getByOwnerName(ownerName: string): Promise<Pueblo | null> {
-    const { data, error } = await supabase
+    const { data, error } = await getClient()
       .from('pueblos')
       .select('*')
       .eq('owner_name', ownerName)
@@ -125,7 +128,7 @@ export const pueblosRepository = {
 
   // Create new pueblo
   async create(pueblo: Omit<Pueblo, 'id' | 'created_at' | 'updated_at'>): Promise<Pueblo | null> {
-    const { data, error } = await supabase
+    const { data, error } = await getClient()
       .from('pueblos')
       .insert(pueblo)
       .select()
@@ -140,7 +143,7 @@ export const pueblosRepository = {
 
   // Update pueblo
   async update(id: string, updates: Partial<Pueblo>): Promise<Pueblo | null> {
-    const { data, error } = await supabase
+    const { data, error } = await getClient()
       .from('pueblos')
       .update(updates)
       .eq('id', id)
@@ -162,7 +165,7 @@ export const pueblosRepository = {
 export const puebloStatsRepository = {
   // Get stats for all pueblos
   async getAll(): Promise<PuebloStats[]> {
-    const { data, error } = await supabase
+    const { data, error } = await getClient()
       .from('pueblo_stats')
       .select('*')
       .order('updated_at', { ascending: false });
@@ -176,7 +179,7 @@ export const puebloStatsRepository = {
 
   // Get stats for specific pueblo
   async getByPuebloId(puebloId: string): Promise<PuebloStats | null> {
-    const { data, error } = await supabase
+    const { data, error } = await getClient()
       .from('pueblo_stats')
       .select('*')
       .eq('pueblo_id', puebloId)
@@ -191,7 +194,7 @@ export const puebloStatsRepository = {
 
   // Update stats for pueblo
   async update(puebloId: string, updates: Partial<PuebloStats>): Promise<PuebloStats | null> {
-    const { data, error } = await supabase
+    const { data, error } = await getClient()
       .from('pueblo_stats')
       .update(updates)
       .eq('pueblo_id', puebloId)
@@ -240,7 +243,7 @@ export const puebloStatsRepository = {
 
   // Reset daily stats (call at midnight)
   async resetDailyStats(): Promise<void> {
-    const { error } = await supabase
+    const { error } = await getClient()
       .from('pueblo_stats')
       .update({
         coins_today: 0,
@@ -262,7 +265,7 @@ export const puebloStatsRepository = {
 export const tareasCompartidasRepository = {
   // Get all shared tasks
   async getAll(): Promise<TareaCompartida[]> {
-    const { data, error } = await supabase
+    const { data, error } = await getClient()
       .from('tareas_compartidas')
       .select('*')
       .order('created_at', { ascending: false });
@@ -276,7 +279,7 @@ export const tareasCompartidasRepository = {
 
   // Get tasks for specific pueblo
   async getByPueblo(puebloId: string): Promise<TareaCompartida[]> {
-    const { data, error } = await supabase
+    const { data, error } = await getClient()
       .from('tareas_compartidas')
       .select('*')
       .contains('pueblos_involucrados', [puebloId])
@@ -291,7 +294,7 @@ export const tareasCompartidasRepository = {
 
   // Get pending tasks
   async getPending(): Promise<TareaCompartida[]> {
-    const { data, error } = await supabase
+    const { data, error } = await getClient()
       .from('tareas_compartidas')
       .select('*')
       .in('estado', ['pending', 'in_progress'])
@@ -306,7 +309,7 @@ export const tareasCompartidasRepository = {
 
   // Create shared task
   async create(tarea: Omit<TareaCompartida, 'id' | 'created_at' | 'updated_at'>): Promise<TareaCompartida | null> {
-    const { data, error } = await supabase
+    const { data, error } = await getClient()
       .from('tareas_compartidas')
       .insert(tarea)
       .select()
@@ -326,7 +329,7 @@ export const tareasCompartidasRepository = {
       const newCompletados = [...tarea.pueblos_completados, puebloId];
       const estado = newCompletados.length === tarea.pueblos_involucrados.length ? 'completed' : 'in_progress';
 
-      await supabase
+      await getClient()
         .from('tareas_compartidas')
         .update({
           pueblos_completados: newCompletados,
@@ -338,7 +341,7 @@ export const tareasCompartidasRepository = {
 
   // Get task by ID
   async getById(id: string): Promise<TareaCompartida | null> {
-    const { data, error } = await supabase
+    const { data, error } = await getClient()
       .from('tareas_compartidas')
       .select('*')
       .eq('id', id)
@@ -359,7 +362,7 @@ export const tareasCompartidasRepository = {
 export const caravanasRepository = {
   // Get active caravans
   async getActive(): Promise<Caravana[]> {
-    const { data, error } = await supabase
+    const { data, error } = await getClient()
       .from('caravanas')
       .select('*')
       .in('estado', ['en_camino', 'llegada'])
@@ -374,7 +377,7 @@ export const caravanasRepository = {
 
   // Create caravan
   async create(caravana: Omit<Caravana, 'id' | 'created_at'>): Promise<Caravana | null> {
-    const { data, error } = await supabase
+    const { data, error } = await getClient()
       .from('caravanas')
       .insert(caravana)
       .select()
@@ -396,7 +399,7 @@ export const caravanasRepository = {
       updates.arrived_at = new Date().toISOString();
     }
 
-    await supabase
+    await getClient()
       .from('caravanas')
       .update(updates)
       .eq('id', id);
@@ -404,7 +407,7 @@ export const caravanasRepository = {
 
   // Mark caravan as completed
   async complete(id: string): Promise<void> {
-    await supabase
+    await getClient()
       .from('caravanas')
       .update({ estado: 'completada' })
       .eq('id', id);
@@ -418,7 +421,7 @@ export const caravanasRepository = {
 export const puebloMessagesRepository = {
   // Get messages for pueblo
   async getForPueblo(puebloId: string, limit = 50): Promise<PuebloMessage[]> {
-    const { data, error } = await supabase
+    const { data, error } = await getClient()
       .from('pueblo_messages')
       .select('*')
       .eq('to_pueblo_id', puebloId)
@@ -434,7 +437,7 @@ export const puebloMessagesRepository = {
 
   // Get unread count
   async getUnreadCount(puebloId: string): Promise<number> {
-    const { count, error } = await supabase
+    const { count, error } = await getClient()
       .from('pueblo_messages')
       .select('*', { count: 'exact', head: true })
       .eq('to_pueblo_id', puebloId)
@@ -449,7 +452,7 @@ export const puebloMessagesRepository = {
 
   // Send message
   async send(message: Omit<PuebloMessage, 'id' | 'created_at' | 'leido'>): Promise<PuebloMessage | null> {
-    const { data, error } = await supabase
+    const { data, error } = await getClient()
       .from('pueblo_messages')
       .insert({ ...message, leido: false })
       .select()
@@ -464,7 +467,7 @@ export const puebloMessagesRepository = {
 
   // Mark as read
   async markAsRead(id: string): Promise<void> {
-    await supabase
+    await getClient()
       .from('pueblo_messages')
       .update({ leido: true })
       .eq('id', id);
@@ -472,7 +475,7 @@ export const puebloMessagesRepository = {
 
   // Mark all as read
   async markAllAsRead(puebloId: string): Promise<void> {
-    await supabase
+    await getClient()
       .from('pueblo_messages')
       .update({ leido: true })
       .eq('to_pueblo_id', puebloId)
