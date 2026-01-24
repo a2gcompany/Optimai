@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, TrendingUp, TrendingDown, ArrowUpDown, Wallet, Upload } from 'lucide-react';
+import { Plus, TrendingUp, TrendingDown, ArrowUpDown, Wallet, Trash2 } from 'lucide-react';
 import { Sidebar } from '@/components';
 import { api, Transaction, DashboardStats } from '@/lib/api';
 import { DbCategory } from '@/lib/supabase';
@@ -76,6 +76,12 @@ export default function FinancePage() {
   };
 
   const filteredCategories = categories.filter((c) => c.type === newTx.type);
+
+  async function handleDeleteTransaction(id: string) {
+    if (!confirm('¿Eliminar esta transacción?')) return;
+    await api.deleteTransaction(id);
+    loadData();
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -269,9 +275,18 @@ export default function FinancePage() {
                         </div>
                       </div>
                     </div>
-                    <span className={`text-lg font-semibold ${typeStyles[tx.type]}`}>
-                      {tx.type === 'income' ? '+' : tx.type === 'expense' ? '-' : ''}{formatCurrency(Math.abs(tx.amount))}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className={`text-lg font-semibold ${typeStyles[tx.type]}`}>
+                        {tx.type === 'income' ? '+' : tx.type === 'expense' ? '-' : ''}{formatCurrency(Math.abs(tx.amount))}
+                      </span>
+                      <button
+                        onClick={() => handleDeleteTransaction(tx.id)}
+                        className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
+                        title="Eliminar"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </li>
               ))}
