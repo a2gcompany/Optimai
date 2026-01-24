@@ -13,8 +13,10 @@ import {
   RefreshCw,
   Search,
   Calendar,
+  FileUp,
 } from 'lucide-react';
 import { Sidebar } from '@/components';
+import { PdfImporter } from '@/components/PdfImporter';
 
 // ============================================================================
 // TYPES
@@ -144,6 +146,9 @@ export default function TasksPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
 
+  // PDF Importer
+  const [showPdfImporter, setShowPdfImporter] = useState(false);
+
   const loadItems = useCallback(async () => {
     try {
       const params: Record<string, string> = {};
@@ -232,6 +237,31 @@ export default function TasksPage() {
     setEditTitle('');
   };
 
+  // Handle PDF import
+  const handlePdfImport = async (importedTasks: Array<{
+    title: string;
+    description?: string;
+    dueDate?: string;
+    dueTime?: string;
+    priority: 'low' | 'medium' | 'high' | 'urgent';
+    source: 'pdf_import';
+    originalText: string;
+    confidence: number;
+  }>) => {
+    // Create tasks one by one
+    for (const task of importedTasks) {
+      await createItem({
+        title: task.title,
+        description: task.originalText,
+        type: 'task',
+        priority: task.priority,
+        due_date: task.dueDate || null,
+      });
+    }
+    // Reload the list
+    loadItems();
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <Sidebar />
@@ -254,6 +284,13 @@ export default function TasksPage() {
               className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors disabled:opacity-50"
             >
               <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
+            </button>
+            <button
+              onClick={() => setShowPdfImporter(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              <FileUp className="w-5 h-5" />
+              Importar PDF
             </button>
             <button
               onClick={() => setShowForm(true)}
@@ -525,6 +562,14 @@ export default function TasksPage() {
             </ul>
           )}
         </div>
+
+        {/* PDF Importer Modal */}
+        {showPdfImporter && (
+          <PdfImporter
+            onImport={handlePdfImport}
+            onClose={() => setShowPdfImporter(false)}
+          />
+        )}
       </main>
     </div>
   );
