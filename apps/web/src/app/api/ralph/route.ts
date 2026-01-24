@@ -5,11 +5,13 @@ import path from 'path';
 
 // API Version: 2.0.0 - Local-first Ralph status with Supabase fallback
 
-// Supabase client (for shared data only)
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-);
+// Lazy Supabase client (for shared data only)
+function getSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) return null;
+  return createClient(url, key);
+}
 
 // Ralph state types
 interface RalphStatus {
@@ -161,6 +163,9 @@ interface SupabaseRalphStatus {
 
 async function getSupabaseRalphStatus(project: string = 'Optimai'): Promise<SupabaseRalphStatus | null> {
   try {
+    const supabase = getSupabase();
+    if (!supabase) return null;
+
     const { data, error } = await supabase
       .from('ralph_status')
       .select('*')
@@ -192,6 +197,9 @@ async function getSupabaseRalphStatus(project: string = 'Optimai'): Promise<Supa
 // Get stats from Supabase
 async function getSupabaseStats() {
   try {
+    const supabase = getSupabase();
+    if (!supabase) return null;
+
     const [tasksResult, remindersResult, ideasResult] = await Promise.all([
       supabase.from('dev_tasks').select('status'),
       supabase.from('reminders').select('status'),

@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabase } from '@/lib/supabase-client';
 import Anthropic from '@anthropic-ai/sdk';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '8366279403';
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-);
 
 interface TelegramUpdate {
   update_id: number;
@@ -34,6 +30,9 @@ async function sendTelegramMessage(chatId: string, text: string) {
 
 // Get recent conversation history
 async function getConversationHistory(chatId: string, limit = 10) {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+
   const { data } = await supabase
     .from('telegram_messages')
     .select('content, direction, created_at')
@@ -52,6 +51,9 @@ async function getConversationHistory(chatId: string, limit = 10) {
 // Get current system state for context
 async function getSystemContext() {
   try {
+    const supabase = getSupabase();
+    if (!supabase) return 'Sistema no conectado a base de datos.';
+
     // Get active terminals
     const { data: terminals } = await supabase
       .from('terminals')
@@ -146,13 +148,17 @@ export async function POST(request: NextRequest) {
 
     console.log(`📱 Telegram from ${chatId}: ${text}`);
 
+    const supabase = getSupabase();
+
     // Store inbound message
-    await supabase.from('telegram_messages').insert({
-      chat_id: chatId,
-      content: text,
-      direction: 'inbound',
-      processed: false,
-    });
+    if (supabase) {
+      await supabase.from('telegram_messages').insert({
+        chat_id: chatId,
+        content: text,
+        direction: 'inbound',
+        processed: false,
+      });
+    }
 
     if (isOwner) {
       // Get history and generate response
@@ -163,20 +169,22 @@ export async function POST(request: NextRequest) {
       await sendTelegramMessage(chatId, response);
 
       // Store outbound message
-      await supabase.from('telegram_messages').insert({
-        chat_id: chatId,
-        content: response,
-        direction: 'outbound',
-        processed: true,
-      });
+      if (supabase) {
+        await supabase.from('telegram_messages').insert({
+          chat_id: chatId,
+          content: response,
+          direction: 'outbound',
+          processed: true,
+        });
 
-      // Mark inbound as processed
-      await supabase
-        .from('telegram_messages')
-        .update({ processed: true })
-        .eq('chat_id', chatId)
-        .eq('direction', 'inbound')
-        .eq('processed', false);
+        // Mark inbound as processed
+        await supabase
+          .from('telegram_messages')
+          .update({ processed: true })
+          .eq('chat_id', chatId)
+          .eq('direction', 'inbound')
+          .eq('processed', false);
+      }
     }
 
     return NextResponse.json({ ok: true });

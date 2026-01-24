@@ -1,11 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-// Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-);
+import { getSupabase } from '@/lib/supabase-client';
 
 // -----------------------------------------------------------------------------
 // Types
@@ -63,6 +57,19 @@ interface WorldState {
 
 export async function GET() {
   try {
+    const supabase = getSupabase();
+
+    // If no supabase, return fallback
+    if (!supabase) {
+      return NextResponse.json({
+        pueblos: getDefaultPueblos(),
+        activity: [],
+        timestamp: new Date().toISOString(),
+        source: 'fallback',
+        message: 'Supabase not configured.',
+      });
+    }
+
     // Cleanup: mark stale terminals offline, delete old ones, prune activity
     await Promise.all([
       markStaleTerminalsOffline(),
@@ -192,6 +199,9 @@ function isRecent(timestamp: string): boolean {
 }
 
 async function markStaleTerminalsOffline(): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) return;
+
   const cutoff = new Date(Date.now() - HEARTBEAT_TIMEOUT_MS).toISOString();
 
   await supabase
@@ -201,8 +211,11 @@ async function markStaleTerminalsOffline(): Promise<void> {
     .lt('last_heartbeat', cutoff);
 }
 
-// Delete terminals that have been offline for more than 1 hour
+// Delete terminals that have been offline for more than 30 minutes
 async function cleanupOldTerminals(): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) return;
+
   const cutoff = new Date(Date.now() - CLEANUP_THRESHOLD_MS).toISOString();
 
   await supabase
@@ -212,8 +225,11 @@ async function cleanupOldTerminals(): Promise<void> {
     .lt('last_heartbeat', cutoff);
 }
 
-// Delete old activity entries (keep last 100 or last 24 hours)
+// Delete old activity entries (keep last 24 hours)
 async function cleanupOldActivity(): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) return;
+
   const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
   await supabase

@@ -1,11 +1,7 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabase } from '@/lib/supabase-client';
 
 // Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-);
 
 // Types
 interface WorldSummary {
@@ -32,6 +28,31 @@ interface WorldSummary {
 
 export async function GET() {
   const project = 'Optimai';
+  const supabase = getSupabase();
+
+  if (!supabase) {
+    return NextResponse.json({
+      ralph: {
+        status: 'stopped',
+        currentBuilding: 'hq',
+        lastAction: 'Supabase no configurado',
+        energy: 0,
+        loopCount: 0,
+        updatedAt: new Date().toISOString(),
+      },
+      counts: {
+        tasksPending: 0,
+        tasksCompleted: 0,
+        tasksCompletedToday: 0,
+        ideas: 0,
+        remindersActive: 0,
+      },
+      finance: {
+        total: 0,
+      },
+      source: 'fallback',
+    } as WorldSummary);
+  }
 
   try {
     // Fetch all data in parallel

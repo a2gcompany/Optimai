@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabase } from '@/lib/supabase-client';
 
 // Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-);
 
 // -----------------------------------------------------------------------------
 // Types
@@ -110,6 +106,9 @@ interface Terminal {
 }
 
 async function findPuebloByOwner(ownerName: string): Promise<Pueblo | null> {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+
   const { data, error } = await supabase
     .from('pueblos')
     .select('id, nombre, owner_name')
@@ -121,6 +120,9 @@ async function findPuebloByOwner(ownerName: string): Promise<Pueblo | null> {
 }
 
 async function createPueblo(ownerName: string): Promise<Pueblo | null> {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+
   const colors = [
     { primary: '#3b82f6', secondary: '#1e40af' }, // blue
     { primary: '#10b981', secondary: '#047857' }, // green
@@ -160,6 +162,9 @@ interface TerminalWithTask extends Terminal {
 }
 
 async function upsertTerminal(puebloId: string, payload: HeartbeatPayload): Promise<{ terminal: Terminal; previousTask: string | null } | null> {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+
   const terminalData = {
     name: payload.name || `${payload.client_type} session`,
     client_type: payload.client_type,
@@ -226,6 +231,9 @@ async function logActivity(
   actionType: string,
   description: string
 ): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) return;
+
   await supabase.from('terminal_activity').insert({
     terminal_id: terminalId,
     pueblo_id: puebloId,
