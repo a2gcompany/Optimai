@@ -550,11 +550,11 @@ const InsightsCard = memo(function InsightsCard({ metrics, activity }: { metrics
 // POLLING CONFIG - Adaptive intervals based on activity
 // ============================================================================
 
-const POLLING_INTERVALS = {
+const POLLING_INTERVALS: Record<'active' | 'idle' | 'error', number> = {
   active: 5000,    // 5s when terminals are active
   idle: 15000,     // 15s when no activity
   error: 30000,    // 30s after errors
-} as const;
+};
 
 // ============================================================================
 // MAIN COMPONENT
