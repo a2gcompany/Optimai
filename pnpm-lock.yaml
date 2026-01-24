@@ -150,6 +150,15 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.24.0
         version: 0.24.3
+      '@optimai/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
+      '@optimai/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@optimai/types':
+        specifier: workspace:*
+        version: link:../../packages/types
       '@supabase/supabase-js':
         specifier: ^2.39.0
         version: 2.91.0

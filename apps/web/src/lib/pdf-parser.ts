@@ -2,8 +2,6 @@
 // PDF Parser - Extract tasks/reminders from PDF files
 // =============================================================================
 
-import * as pdfParse from 'pdf-parse';
-
 // -----------------------------------------------------------------------------
 // Types
 // -----------------------------------------------------------------------------
@@ -277,16 +275,17 @@ function extractTasksFromText(text: string): ImportedTask[] {
 
 export async function parsePdfToTasks(pdfBuffer: Buffer): Promise<ParseResult> {
   try {
-    // pdf-parse exports a function directly
-    const pdf = (pdfParse as unknown as { default: (buffer: Buffer) => Promise<{ text: string; numpages: number }> }).default || pdfParse;
-    const data = await (pdf as (buffer: Buffer) => Promise<{ text: string; numpages: number }>)(pdfBuffer);
+    // Dynamic import for pdf-parse v2.x
+    const { PDFParse } = await import('pdf-parse');
+    const parser = new PDFParse({ data: new Uint8Array(pdfBuffer) });
+    const textResult = await parser.getText();
 
-    const tasks = extractTasksFromText(data.text);
+    const tasks = extractTasksFromText(textResult.text);
 
     return {
       tasks,
-      rawText: data.text,
-      pageCount: data.numpages,
+      rawText: textResult.text,
+      pageCount: textResult.pages.length,
     };
   } catch (error) {
     throw new Error(`Error parsing PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
