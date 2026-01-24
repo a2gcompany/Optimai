@@ -1,0 +1,11 @@
+{
+  "project_name": "optimai",
+  "max_iterations": 50,
+  "auto_commit": true,
+  "commit_frequency": "after_each_task",
+  "branch_prefix": "claude/",
+  "monitoring": {
+    "enabled": true,
+    "log_level": "info"
+  }
+}
