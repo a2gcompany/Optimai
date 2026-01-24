@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo, memo } from 'react';
 import { useRouter } from 'next/navigation';
 
 // ============================================================================
@@ -46,9 +46,18 @@ interface Activity {
   created_at: string;
 }
 
+interface ProductivityMetrics {
+  totalTasksToday: number;
+  totalTerminalsActive: number;
+  averageEnergy: number;
+  peakHour: number | null;
+  currentStreak: number;
+}
+
 interface WorldState {
   pueblos: Pueblo[];
   activity: Activity[];
+  metrics: ProductivityMetrics;
   timestamp: string;
 }
 
@@ -77,7 +86,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; animate: boo
 // COMPONENTS
 // ============================================================================
 
-function TerminalCard({ terminal }: { terminal: Terminal }) {
+const TerminalCard = memo(function TerminalCard({ terminal }: { terminal: Terminal }) {
   const config = STATUS_CONFIG[terminal.status] || STATUS_CONFIG.offline;
   const icon = CLIENT_ICONS[terminal.client_type] || CLIENT_ICONS.other;
   const isOnline = terminal.status !== 'offline';
@@ -126,9 +135,9 @@ function TerminalCard({ terminal }: { terminal: Terminal }) {
       </div>
     </div>
   );
-}
+});
 
-function PuebloCard({ pueblo, expanded, onToggle }: { pueblo: Pueblo; expanded: boolean; onToggle: () => void }) {
+const PuebloCard = memo(function PuebloCard({ pueblo, expanded, onToggle }: { pueblo: Pueblo; expanded: boolean; onToggle: () => void }) {
   const activeTerminals = pueblo.terminals.filter((t) => t.status !== 'offline');
   const hasActivity = activeTerminals.length > 0;
 
@@ -199,77 +208,164 @@ function PuebloCard({ pueblo, expanded, onToggle }: { pueblo: Pueblo; expanded: 
       </div>
     </div>
   );
-}
+});
 
 // Timeline visual del día - muestra actividad por horas
-function DailyTimeline({ activity }: { activity: Activity[] }) {
-  // Agrupa actividad por hora
-  const hourlyActivity = new Map<number, Activity[]>();
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+const DailyTimeline = memo(function DailyTimeline({ activity }: { activity: Activity[] }) {
+  const [viewMode, setViewMode] = useState<'today' | 'week'>('today');
 
-  activity.forEach((item) => {
-    const date = new Date(item.created_at);
-    if (date >= todayStart) {
-      const hour = date.getHours();
-      if (!hourlyActivity.has(hour)) {
-        hourlyActivity.set(hour, []);
+  // Agrupa actividad por hora (hoy)
+  const hourlyActivity = useMemo(() => {
+    const map = new Map<number, Activity[]>();
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    activity.forEach((item) => {
+      const date = new Date(item.created_at);
+      if (date >= todayStart) {
+        const hour = date.getHours();
+        if (!map.has(hour)) {
+          map.set(hour, []);
+        }
+        map.get(hour)!.push(item);
       }
-      hourlyActivity.get(hour)!.push(item);
-    }
-  });
+    });
+    return map;
+  }, [activity]);
 
+  // Agrupa actividad por día de la semana
+  const weeklyActivity = useMemo(() => {
+    const map = new Map<number, Activity[]>();
+    const now = new Date();
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - 6); // Last 7 days
+    weekStart.setHours(0, 0, 0, 0);
+
+    activity.forEach((item) => {
+      const date = new Date(item.created_at);
+      if (date >= weekStart) {
+        const dayIndex = Math.floor((date.getTime() - weekStart.getTime()) / (24 * 60 * 60 * 1000));
+        if (!map.has(dayIndex)) {
+          map.set(dayIndex, []);
+        }
+        map.get(dayIndex)!.push(item);
+      }
+    });
+    return map;
+  }, [activity]);
+
+  const now = new Date();
   const currentHour = now.getHours();
+  const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
   return (
     <div className="space-y-2">
-      {/* Timeline visual */}
-      <div className="flex gap-0.5">
-        {Array.from({ length: 24 }, (_, hour) => {
-          const hasActivity = hourlyActivity.has(hour);
-          const activityCount = hourlyActivity.get(hour)?.length || 0;
-          const isCurrent = hour === currentHour;
-          const isPast = hour < currentHour;
+      {/* View mode toggle */}
+      <div className="flex gap-1 mb-2">
+        <button
+          onClick={() => setViewMode('today')}
+          className={`px-2 py-0.5 text-[10px] rounded ${viewMode === 'today' ? 'bg-blue-500 text-white' : 'bg-slate-700 text-slate-400'}`}
+        >
+          Hoy
+        </button>
+        <button
+          onClick={() => setViewMode('week')}
+          className={`px-2 py-0.5 text-[10px] rounded ${viewMode === 'week' ? 'bg-blue-500 text-white' : 'bg-slate-700 text-slate-400'}`}
+        >
+          Semana
+        </button>
+      </div>
 
-          return (
-            <div
-              key={hour}
-              className={`
-                flex-1 h-6 rounded-sm relative group cursor-pointer
-                ${hasActivity
-                  ? 'bg-green-500'
-                  : isPast
-                    ? 'bg-slate-700'
-                    : 'bg-slate-800'
-                }
-                ${isCurrent ? 'ring-2 ring-white/50' : ''}
-              `}
-              style={{
-                opacity: hasActivity ? Math.min(0.4 + activityCount * 0.2, 1) : 1,
-              }}
-              title={`${hour}:00 - ${activityCount} eventos`}
-            >
-              {/* Tooltip on hover */}
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-10">
-                <div className="bg-slate-900 text-white text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap">
-                  {hour}:00 {hasActivity ? `(${activityCount})` : ''}
+      {viewMode === 'today' ? (
+        <>
+          {/* Timeline visual - Hoy */}
+          <div className="flex gap-0.5">
+            {Array.from({ length: 24 }, (_, hour) => {
+              const hasActivity = hourlyActivity.has(hour);
+              const activityCount = hourlyActivity.get(hour)?.length || 0;
+              const isCurrent = hour === currentHour;
+              const isPast = hour < currentHour;
+
+              return (
+                <div
+                  key={hour}
+                  className={`
+                    flex-1 h-6 rounded-sm relative group cursor-pointer
+                    ${hasActivity
+                      ? 'bg-green-500'
+                      : isPast
+                        ? 'bg-slate-700'
+                        : 'bg-slate-800'
+                    }
+                    ${isCurrent ? 'ring-2 ring-white/50' : ''}
+                  `}
+                  style={{
+                    opacity: hasActivity ? Math.min(0.4 + activityCount * 0.2, 1) : 1,
+                  }}
+                  title={`${hour}:00 - ${activityCount} eventos`}
+                >
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-10">
+                    <div className="bg-slate-900 text-white text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap">
+                      {hour}:00 {hasActivity ? `(${activityCount})` : ''}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+              );
+            })}
+          </div>
+          <div className="flex justify-between text-[10px] text-slate-600 px-0.5">
+            <span>0h</span>
+            <span>6h</span>
+            <span>12h</span>
+            <span>18h</span>
+            <span>24h</span>
+          </div>
+        </>
+      ) : (
+        <>
+          {/* Timeline visual - Semana */}
+          <div className="flex gap-1">
+            {Array.from({ length: 7 }, (_, dayIndex) => {
+              const hasActivity = weeklyActivity.has(dayIndex);
+              const activityCount = weeklyActivity.get(dayIndex)?.length || 0;
+              const isToday = dayIndex === 6;
+              const date = new Date();
+              date.setDate(date.getDate() - (6 - dayIndex));
+              const dayName = dayNames[date.getDay()];
 
-      {/* Leyenda de horas */}
-      <div className="flex justify-between text-[10px] text-slate-600 px-0.5">
-        <span>0h</span>
-        <span>6h</span>
-        <span>12h</span>
-        <span>18h</span>
-        <span>24h</span>
-      </div>
+              return (
+                <div key={dayIndex} className="flex-1 text-center">
+                  <div
+                    className={`
+                      h-8 rounded relative group cursor-pointer mb-1
+                      ${hasActivity
+                        ? 'bg-green-500'
+                        : 'bg-slate-700'
+                      }
+                      ${isToday ? 'ring-2 ring-white/50' : ''}
+                    `}
+                    style={{
+                      opacity: hasActivity ? Math.min(0.3 + activityCount * 0.1, 1) : 0.5,
+                    }}
+                    title={`${dayName} - ${activityCount} eventos`}
+                  >
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-10">
+                      <div className="bg-slate-900 text-white text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap">
+                        {activityCount} eventos
+                      </div>
+                    </div>
+                  </div>
+                  <div className={`text-[9px] ${isToday ? 'text-white font-bold' : 'text-slate-500'}`}>
+                    {dayName}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
 
-      {/* Actividad reciente (últimos 5) */}
+      {/* Actividad reciente */}
       {activity.length > 0 && (
         <div className="mt-3 space-y-1">
           <div className="text-[10px] text-slate-500 uppercase tracking-wider">Último cambio</div>
@@ -292,9 +388,9 @@ function DailyTimeline({ activity }: { activity: Activity[] }) {
       )}
     </div>
   );
-}
+});
 
-function ActivityFeed({ activity }: { activity: Activity[] }) {
+const ActivityFeed = memo(function ActivityFeed({ activity }: { activity: Activity[] }) {
   if (activity.length === 0) {
     return (
       <div className="text-slate-500 text-center py-4">
@@ -322,7 +418,143 @@ function ActivityFeed({ activity }: { activity: Activity[] }) {
       ))}
     </div>
   );
-}
+});
+
+// Productivity metrics card
+const MetricsCard = memo(function MetricsCard({ metrics }: { metrics: ProductivityMetrics }) {
+  return (
+    <div className="bg-slate-800/50 rounded-xl border-2 border-slate-700 p-4">
+      <h3 className="font-bold mb-3 flex items-center gap-2">
+        📈 Productividad
+      </h3>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+          <div className="text-2xl font-bold text-green-400">{metrics.totalTasksToday}</div>
+          <div className="text-[10px] text-slate-500 uppercase">Tareas hoy</div>
+        </div>
+        <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+          <div className="text-2xl font-bold text-blue-400">{metrics.totalTerminalsActive}</div>
+          <div className="text-[10px] text-slate-500 uppercase">Activos</div>
+        </div>
+        <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+          <div className="text-2xl font-bold text-yellow-400">{metrics.averageEnergy}%</div>
+          <div className="text-[10px] text-slate-500 uppercase">Energía</div>
+        </div>
+        <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+          <div className="text-2xl font-bold text-purple-400">
+            {metrics.currentStreak > 0 ? `${metrics.currentStreak}h` : '-'}
+          </div>
+          <div className="text-[10px] text-slate-500 uppercase">Racha</div>
+        </div>
+      </div>
+      {metrics.peakHour !== null && (
+        <div className="mt-3 text-xs text-slate-400 text-center">
+          Hora pico: <span className="text-white font-medium">{metrics.peakHour}:00</span>
+        </div>
+      )}
+    </div>
+  );
+});
+
+// Insights card - análisis de patrones de trabajo
+const InsightsCard = memo(function InsightsCard({ metrics, activity }: { metrics: ProductivityMetrics; activity: Activity[] }) {
+  const insights = useMemo(() => {
+    const result: { icon: string; text: string; type: 'success' | 'warning' | 'info' }[] = [];
+
+    // Insight: Racha de productividad
+    if (metrics.currentStreak >= 3) {
+      result.push({
+        icon: '🔥',
+        text: `${metrics.currentStreak}h de actividad continua`,
+        type: 'success',
+      });
+    }
+
+    // Insight: Hora pico
+    if (metrics.peakHour !== null) {
+      const peakLabel = metrics.peakHour < 12 ? 'mañana' : metrics.peakHour < 18 ? 'tarde' : 'noche';
+      result.push({
+        icon: '⚡',
+        text: `Mayor productividad por la ${peakLabel}`,
+        type: 'info',
+      });
+    }
+
+    // Insight: Energía baja
+    if (metrics.averageEnergy < 50) {
+      result.push({
+        icon: '🔋',
+        text: 'Energía baja - considera tomar un descanso',
+        type: 'warning',
+      });
+    }
+
+    // Insight: Sin actividad
+    if (metrics.totalTerminalsActive === 0) {
+      result.push({
+        icon: '💤',
+        text: 'Sin terminales activas',
+        type: 'info',
+      });
+    }
+
+    // Insight: Alta productividad
+    if (metrics.totalTasksToday >= 10) {
+      result.push({
+        icon: '🚀',
+        text: `${metrics.totalTasksToday} tareas completadas hoy`,
+        type: 'success',
+      });
+    }
+
+    // Insight: Múltiples terminales
+    if (metrics.totalTerminalsActive >= 3) {
+      result.push({
+        icon: '🖥️',
+        text: `${metrics.totalTerminalsActive} terminales en paralelo`,
+        type: 'info',
+      });
+    }
+
+    return result.slice(0, 3); // Máximo 3 insights
+  }, [metrics, activity]);
+
+  if (insights.length === 0) {
+    return null;
+  }
+
+  const typeColors = {
+    success: 'text-green-400',
+    warning: 'text-yellow-400',
+    info: 'text-blue-400',
+  };
+
+  return (
+    <div className="bg-slate-800/50 rounded-xl border-2 border-slate-700 p-4">
+      <h3 className="font-bold mb-3 flex items-center gap-2">
+        💡 Insights
+      </h3>
+      <div className="space-y-2">
+        {insights.map((insight, idx) => (
+          <div key={idx} className="flex items-center gap-2 text-xs">
+            <span>{insight.icon}</span>
+            <span className={typeColors[insight.type]}>{insight.text}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+});
+
+// ============================================================================
+// POLLING CONFIG - Adaptive intervals based on activity
+// ============================================================================
+
+const POLLING_INTERVALS = {
+  active: 5000,    // 5s when terminals are active
+  idle: 15000,     // 15s when no activity
+  error: 30000,    // 30s after errors
+} as const;
 
 // ============================================================================
 // MAIN COMPONENT
@@ -334,34 +566,46 @@ export default function WorldPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedPueblo, setExpandedPueblo] = useState<string | null>(null);
+  const [pollingInterval, setPollingInterval] = useState(POLLING_INTERVALS.active);
 
-  // Fetch data from /api/terminals
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const res = await fetch('/api/terminals');
-        if (!res.ok) throw new Error('API error');
-        const json = await res.json();
-        setData(json);
-        setError(null);
-      } catch (err) {
-        console.error('Error fetching world state:', err);
-        setError('Error de conexión');
-      } finally {
-        setLoading(false);
-      }
+  // Memoized fetch function with adaptive polling
+  const fetchData = useCallback(async () => {
+    try {
+      const res = await fetch('/api/terminals');
+      if (!res.ok) throw new Error('API error');
+      const json: WorldState = await res.json();
+      setData(json);
+      setError(null);
+
+      // Adaptive polling: faster when there's activity
+      const hasActiveTerminals = json.pueblos.some(p => p.stats.terminals_active > 0);
+      setPollingInterval(hasActiveTerminals ? POLLING_INTERVALS.active : POLLING_INTERVALS.idle);
+    } catch (err) {
+      console.error('Error fetching world state:', err);
+      setError('Error de conexión');
+      setPollingInterval(POLLING_INTERVALS.error);
+    } finally {
+      setLoading(false);
     }
-
-    fetchData();
-    const interval = setInterval(fetchData, 3000); // Refresh every 3s for real-time feel
-    return () => clearInterval(interval);
   }, []);
 
-  // Count total active terminals
-  const totalActive = data?.pueblos.reduce(
-    (acc, p) => acc + p.stats.terminals_active,
-    0
-  ) || 0;
+  // Adaptive polling effect
+  useEffect(() => {
+    fetchData();
+    const interval = setInterval(fetchData, pollingInterval);
+    return () => clearInterval(interval);
+  }, [fetchData, pollingInterval]);
+
+  // Count total active terminals (memoized)
+  const totalActive = useMemo(() =>
+    data?.pueblos.reduce((acc, p) => acc + p.stats.terminals_active, 0) || 0,
+    [data?.pueblos]
+  );
+
+  // Memoized toggle handler
+  const handleToggle = useCallback((puebloId: string) => {
+    setExpandedPueblo(prev => prev === puebloId ? null : puebloId);
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-900 text-white font-mono">
@@ -429,9 +673,7 @@ export default function WorldPage() {
                     key={pueblo.id}
                     pueblo={pueblo}
                     expanded={expandedPueblo === pueblo.id}
-                    onToggle={() =>
-                      setExpandedPueblo(expandedPueblo === pueblo.id ? null : pueblo.id)
-                    }
+                    onToggle={() => handleToggle(pueblo.id)}
                   />
                 ))}
               </div>
@@ -450,6 +692,12 @@ export default function WorldPage() {
 
             {/* Sidebar */}
             <div className="space-y-6">
+              {/* Productivity Metrics */}
+              {data?.metrics && <MetricsCard metrics={data.metrics} />}
+
+              {/* Insights */}
+              {data?.metrics && <InsightsCard metrics={data.metrics} activity={data.activity} />}
+
               {/* How to connect */}
               <div className="bg-slate-800/50 rounded-xl border-2 border-slate-700 p-4">
                 <h3 className="font-bold mb-3 flex items-center gap-2">
@@ -496,7 +744,7 @@ export default function WorldPage() {
       {/* Footer */}
       <footer className="border-t border-slate-800 py-4 mt-8">
         <div className="max-w-6xl mx-auto px-4 text-center text-xs text-slate-600">
-          Optimai World • Multi-user terminal monitoring • Refresh cada 3s
+          Optimai World • Multi-user terminal monitoring • Refresh cada {pollingInterval / 1000}s
         </div>
       </footer>
     </div>

@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getSupabase } from '@/lib/supabase-client';
 
+// Revalidate every 5 seconds for better caching
+export const revalidate = 5;
+
 // -----------------------------------------------------------------------------
 // Types
 // -----------------------------------------------------------------------------
@@ -44,9 +47,18 @@ interface Activity {
   created_at: string;
 }
 
+interface ProductivityMetrics {
+  totalTasksToday: number;
+  totalTerminalsActive: number;
+  averageEnergy: number;
+  peakHour: number | null;
+  currentStreak: number; // hours with continuous activity
+}
+
 interface WorldState {
   pueblos: Pueblo[];
   activity: Activity[];
+  metrics: ProductivityMetrics;
   timestamp: string;
 }
 
@@ -64,6 +76,7 @@ export async function GET() {
       return NextResponse.json({
         pueblos: getDefaultPueblos(),
         activity: [],
+        metrics: getDefaultMetrics(),
         timestamp: new Date().toISOString(),
         source: 'fallback',
         message: 'Supabase not configured.',
@@ -105,6 +118,7 @@ export async function GET() {
       return NextResponse.json({
         pueblos: getDefaultPueblos(),
         activity: [],
+        metrics: getDefaultMetrics(),
         timestamp: new Date().toISOString(),
         source: 'fallback',
         message: 'Tables not created yet. Run migration SQL in Supabase Dashboard.',
@@ -124,54 +138,67 @@ export async function GET() {
       updated_at: new Date().toISOString(),
     }));
 
+    // Build pueblos data
+    const pueblosData = finalPueblos.map((pueblo) => {
+      const puebloTerminals = terminals.filter((t) => t.pueblo_id === pueblo.id);
+      const puebloStats = stats.find((s) => s.pueblo_id === pueblo.id);
+
+      return {
+        id: pueblo.id,
+        nombre: pueblo.nombre,
+        owner_name: pueblo.owner_name,
+        avatar_emoji: pueblo.avatar_emoji,
+        color_primary: pueblo.color_primary,
+        color_secondary: pueblo.color_secondary,
+        terminals: puebloTerminals.map((t) => ({
+          id: t.id,
+          name: t.name,
+          client_type: t.client_type,
+          session_id: t.session_id,
+          status: t.status,
+          current_task: t.current_task,
+          current_file: t.current_file,
+          speech_bubble: t.speech_bubble,
+          tasks_completed: t.tasks_completed || 0,
+          energy: t.energy || 100,
+          last_heartbeat: t.last_heartbeat,
+        })),
+        stats: {
+          terminals_active: puebloTerminals.filter(
+            (t) => t.status !== 'offline' && isRecent(t.last_heartbeat)
+          ).length,
+          tasks_pending: puebloStats?.tasks_pending || 0,
+          tasks_completed_today: puebloStats?.tasks_completed_today || 0,
+          energy: puebloStats?.energy_current || 100,
+        },
+      };
+    });
+
+    const activityData = (activityResult.data || []).map((a) => ({
+      id: a.id,
+      pueblo_name: a.pueblos?.nombre || 'Unknown',
+      terminal_name: a.terminals?.name || 'Unknown',
+      action_type: a.action_type,
+      description: a.description,
+      created_at: a.created_at,
+    }));
+
+    // Calculate productivity metrics
+    const metrics = calculateProductivityMetrics(pueblosData, activityData);
+
     // Build response
     const worldState: WorldState = {
-      pueblos: finalPueblos.map((pueblo) => {
-        const puebloTerminals = terminals.filter((t) => t.pueblo_id === pueblo.id);
-        const puebloStats = stats.find((s) => s.pueblo_id === pueblo.id);
-
-        return {
-          id: pueblo.id,
-          nombre: pueblo.nombre,
-          owner_name: pueblo.owner_name,
-          avatar_emoji: pueblo.avatar_emoji,
-          color_primary: pueblo.color_primary,
-          color_secondary: pueblo.color_secondary,
-          terminals: puebloTerminals.map((t) => ({
-            id: t.id,
-            name: t.name,
-            client_type: t.client_type,
-            session_id: t.session_id,
-            status: t.status,
-            current_task: t.current_task,
-            current_file: t.current_file,
-            speech_bubble: t.speech_bubble,
-            tasks_completed: t.tasks_completed || 0,
-            energy: t.energy || 100,
-            last_heartbeat: t.last_heartbeat,
-          })),
-          stats: {
-            terminals_active: puebloTerminals.filter(
-              (t) => t.status !== 'offline' && isRecent(t.last_heartbeat)
-            ).length,
-            tasks_pending: puebloStats?.tasks_pending || 0,
-            tasks_completed_today: puebloStats?.tasks_completed_today || 0,
-            energy: puebloStats?.energy_current || 100,
-          },
-        };
-      }),
-      activity: (activityResult.data || []).map((a) => ({
-        id: a.id,
-        pueblo_name: a.pueblos?.nombre || 'Unknown',
-        terminal_name: a.terminals?.name || 'Unknown',
-        action_type: a.action_type,
-        description: a.description,
-        created_at: a.created_at,
-      })),
+      pueblos: pueblosData,
+      activity: activityData,
+      metrics,
       timestamp: new Date().toISOString(),
     };
 
-    return NextResponse.json(worldState);
+    return NextResponse.json(worldState, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=5, stale-while-revalidate=10',
+      },
+    });
   } catch (error) {
     console.error('Error fetching terminals:', error);
 
@@ -179,6 +206,7 @@ export async function GET() {
     return NextResponse.json({
       pueblos: getDefaultPueblos(),
       activity: [],
+      metrics: getDefaultMetrics(),
       timestamp: new Date().toISOString(),
     } as WorldState);
   }
@@ -190,6 +218,71 @@ export async function GET() {
 
 // Terminals are considered active if heartbeat within last 60 seconds
 const HEARTBEAT_TIMEOUT_MS = 60 * 1000;
+
+function calculateProductivityMetrics(pueblos: Pueblo[], activity: Activity[]): ProductivityMetrics {
+  // Total tasks completed today across all pueblos
+  const totalTasksToday = pueblos.reduce((acc, p) => acc + p.stats.tasks_completed_today, 0);
+
+  // Total active terminals
+  const totalTerminalsActive = pueblos.reduce((acc, p) => acc + p.stats.terminals_active, 0);
+
+  // Average energy across all pueblos with activity
+  const energyValues = pueblos.filter(p => p.stats.terminals_active > 0).map(p => p.stats.energy);
+  const averageEnergy = energyValues.length > 0
+    ? Math.round(energyValues.reduce((a, b) => a + b, 0) / energyValues.length)
+    : 100;
+
+  // Find peak hour from activity
+  const hourCounts = new Map<number, number>();
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  activity.forEach(a => {
+    const activityDate = new Date(a.created_at);
+    if (activityDate >= todayStart) {
+      const hour = activityDate.getHours();
+      hourCounts.set(hour, (hourCounts.get(hour) || 0) + 1);
+    }
+  });
+
+  let peakHour: number | null = null;
+  let maxCount = 0;
+  hourCounts.forEach((count, hour) => {
+    if (count > maxCount) {
+      maxCount = count;
+      peakHour = hour;
+    }
+  });
+
+  // Calculate current streak (consecutive hours with activity ending now)
+  const currentHour = now.getHours();
+  let currentStreak = 0;
+  for (let h = currentHour; h >= 0; h--) {
+    if (hourCounts.has(h)) {
+      currentStreak++;
+    } else {
+      break;
+    }
+  }
+
+  return {
+    totalTasksToday,
+    totalTerminalsActive,
+    averageEnergy,
+    peakHour,
+    currentStreak,
+  };
+}
+
+function getDefaultMetrics(): ProductivityMetrics {
+  return {
+    totalTasksToday: 0,
+    totalTerminalsActive: 0,
+    averageEnergy: 100,
+    peakHour: null,
+    currentStreak: 0,
+  };
+}
 // Delete offline terminals after 30 minutes of inactivity
 const CLEANUP_THRESHOLD_MS = 30 * 60 * 1000;
 
